@@ -10,7 +10,7 @@ import {
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { AUTH } from '../src/auth/auth.module';
-import type { Auth } from '../src/auth/better-auth';
+import { settleAuthBackgroundTasks, type Auth } from '../src/auth/better-auth';
 import { issueAccessToken } from '../src/auth/tokens';
 import { createApp } from '../src/bootstrap';
 import { loadConfig } from '../src/config';
@@ -29,7 +29,10 @@ const auth = (path: string) => `/api/v1/auth${path}`;
 const bearer = (t: string) => ({ Authorization: `Bearer ${t}` });
 const PASSWORD = `test-${randomBytes(12).toString('hex')}`;
 const NEW_PASSWORD = `new-${randomBytes(12).toString('hex')}`;
-const drain = () => app.get(MailWorker).drain();
+const drain = async () => {
+  await settleAuthBackgroundTasks();
+  return app.get(MailWorker).drain();
+};
 const lastTo = (email: string) => mail.sent.filter((m) => m.to === email).at(-1);
 const linkIn = (text: string) => text.match(/https?:\/\/\S+/)![0];
 
@@ -258,8 +261,8 @@ describe('password recovery (§9.2)', () => {
 
   it('sends at most one email a minute to the same address', async () => {
     await db.adminPool.query(`DELETE FROM auth.mail_outbox WHERE to_email = 'rana@trend.sa'`);
-    await requestReset('rana@trend.sa');
-    await requestReset('rana@trend.sa');
+    // متزامنة، كأنها من نسخ خادم مختلفة.
+    await Promise.all(Array.from({ length: 5 }, () => requestReset('rana@trend.sa')));
     expect(await drain()).toBe(1);
   });
 

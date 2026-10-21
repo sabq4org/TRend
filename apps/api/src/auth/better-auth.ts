@@ -5,7 +5,7 @@ import { bearer, haveIBeenPwned, jwt, twoFactor } from 'better-auth/plugins';
 import type { Pool } from 'pg';
 import { isLocale } from '@trend/i18n';
 import type { AppConfig } from '../config';
-import { enqueueMail } from '../mail/outbox';
+import { enqueueMailAtMostEvery } from '../mail/outbox';
 import { PASSWORD_RESET_TTL_MINUTES } from '../mail/templates';
 import { hashPassword, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, verifyPassword } from './password';
 
@@ -21,6 +21,18 @@ export const LOCKOUT_SECONDS = 15 * 60;
 const RESET_MAIL_INTERVAL_SECONDS = 60;
 /** مهلة قبول رمز التجديد السابق بعد تدويره، حتى لا تخرج نافذتان تجددان معاً. */
 const ROTATION_GRACE_SECONDS = 30;
+
+const backgroundTasks = new Set<Promise<unknown>>();
+
+function trackBackgroundTask(task: Promise<unknown>) {
+  backgroundTasks.add(task);
+  void task.finally(() => backgroundTasks.delete(task));
+}
+
+/** ينتظر مهام Better Auth الخلفية (كإضافة رسالة الاستعادة). للاختبارات وإيقاف الخادم. */
+export async function settleAuthBackgroundTasks(): Promise<void> {
+  while (backgroundTasks.size) await Promise.allSettled([...backgroundTasks]);
+}
 
 export interface ResolvedLogin {
   userId: string;
@@ -92,6 +104,7 @@ export function createAuth({ config, authPool, appPool }: AuthDeps) {
     telemetry: { enabled: false },
     advanced: {
       database: { generateId: 'uuid' },
+      backgroundTasks: { handler: trackBackgroundTask },
       useSecureCookies: config.NODE_ENV === 'production',
       ipAddress: { ipAddressHeaders: ['x-forwarded-for'] },
     },
@@ -105,6 +118,8 @@ export function createAuth({ config, authPool, appPool }: AuthDeps) {
       // §9.2: الاستعادة بالبريد. الرابط لمرة واحدة، وتعيين كلمة مرور جديدة ينهي كل الجلسات.
       revokeSessionsOnPasswordReset: true,
       resetPasswordTokenExpiresIn: PASSWORD_RESET_TTL_MINUTES * 60,
+      // يعمل في الخلفية (advanced.backgroundTasks أدناه)، فلا يطول الرد لحساب موجود عنه
+      // لبريد غير مسجل، ولا يُعرف وجود الحساب من زمن الاستجابة.
       sendResetPassword: async ({ user, token }) => {
         // لا رسالة لحساب موقوف أو لم يفعّل، والرد للطالب واحد في كل الحالات.
         const { rows } = await appPool.query<{
@@ -114,14 +129,8 @@ export function createAuth({ config, authPool, appPool }: AuthDeps) {
         }>('SELECT * FROM app.reset_recipient($1)', [user.id]);
         const r = rows[0];
         if (!r) return;
-        const recent = await authPool.query(
-          `SELECT 1 FROM mail_outbox WHERE to_email = $1 AND template = 'password_reset'
-              AND created_at > now() - make_interval(secs => $2)`,
-          [user.email.toLowerCase(), RESET_MAIL_INTERVAL_SECONDS],
-        );
-        if (recent.rowCount) return;
         const locale = isLocale(r.locale) ? r.locale : 'ar';
-        await enqueueMail(authPool, user.email, locale, {
+        await enqueueMailAtMostEvery(authPool, RESET_MAIL_INTERVAL_SECONDS, user.email, locale, {
           template: 'password_reset',
           payload: {
             name: (locale === 'en' ? r.name_en : null) ?? r.name_ar,

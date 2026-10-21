@@ -20,7 +20,13 @@ export interface MailTransport {
 export const MAIL_TRANSPORT = Symbol('MAIL_TRANSPORT');
 
 export function smtpTransport(url: string): MailTransport {
-  const transporter = createTransport(url);
+  // مهلات محدودة: اتصال معلّق لا يحجز الرسالة أطول من مدة حجزها في العامل.
+  const transporter = createTransport({
+    url,
+    connectionTimeout: 15_000,
+    greetingTimeout: 15_000,
+    socketTimeout: 30_000,
+  });
   return {
     async send(mail) {
       await transporter.sendMail(mail);

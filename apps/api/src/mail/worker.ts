@@ -14,10 +14,12 @@ import { MAIL_TRANSPORT, type MailTransport } from './transport';
 
 /** بعد هذه المحاولات تُترك الرسالة فاشلة ويُمسح رابطها. */
 export const MAX_MAIL_ATTEMPTS = 5;
-const BATCH = 20;
 const POLL_MS = 2_000;
-/** مدة حجز الصف أثناء الإرسال. */
-const LEASE_SECONDS = 60;
+/**
+ * مدة حجز الصف أثناء إرساله. يُحجز صف واحد في كل مرة، وإرساله محدود بمهلات SMTP
+ * (transport.ts، دقيقة على الأكثر)، فلا ينتهي الحجز قبل انتهاء الإرسال فتلتقطه نسخة أخرى.
+ */
+const LEASE_SECONDS = 120;
 
 interface Row {
   id: string;
@@ -26,7 +28,6 @@ interface Row {
   locale: string;
   payload: MailMessage['payload'];
   attempts: number;
-  created_at: Date;
 }
 
 /**
@@ -68,26 +69,24 @@ export class MailWorker implements OnApplicationBootstrap, OnModuleDestroy {
 
   private async drainAll(): Promise<number> {
     let sent = 0;
-    for (;;) {
-      const batch = await this.claim();
-      for (const row of batch) if (await this.deliver(row)) sent++;
-      if (batch.length < BATCH) return sent;
+    for (let row = await this.claim(); row; row = await this.claim()) {
+      if (await this.deliver(row)) sent++;
     }
+    return sent;
   }
 
-  private async claim(): Promise<Row[]> {
+  private async claim(): Promise<Row | undefined> {
     const { rows } = await this.pool.query<Row>(
       `UPDATE auth.mail_outbox SET attempts = attempts + 1,
-              locked_until = now() + make_interval(secs => $2)
+              locked_until = now() + make_interval(secs => $1)
         WHERE id IN (SELECT id FROM auth.mail_outbox
-                      WHERE sent_at IS NULL AND attempts < $3 AND send_after <= now()
+                      WHERE sent_at IS NULL AND attempts < $2 AND send_after <= now()
                         AND (locked_until IS NULL OR locked_until < now())
-                      ORDER BY send_after LIMIT $1 FOR UPDATE SKIP LOCKED)
-        RETURNING id, template, to_email, locale, payload, attempts, created_at`,
-      [BATCH, LEASE_SECONDS, MAX_MAIL_ATTEMPTS],
+                      ORDER BY send_after, created_at LIMIT 1 FOR UPDATE SKIP LOCKED)
+        RETURNING id, template, to_email, locale, payload, attempts`,
+      [LEASE_SECONDS, MAX_MAIL_ATTEMPTS],
     );
-    // RETURNING لا يضمن الترتيب؛ الأقدم يُرسل أولاً.
-    return rows.sort((a, b) => a.created_at.getTime() - b.created_at.getTime());
+    return rows[0];
   }
 
   private async deliver(row: Row): Promise<boolean> {

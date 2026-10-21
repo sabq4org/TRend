@@ -4,7 +4,6 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { IBM_Plex_Sans_Arabic } from 'next/font/google';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { Sidebar } from '@/components/Sidebar';
 import { routing } from '@/i18n/routing';
 import '../globals.css';
 
@@ -45,12 +44,7 @@ export default async function LocaleLayout({
       suppressHydrationWarning
     >
       <body className="min-h-dvh bg-bg text-fg antialiased">
-        <NextIntlClientProvider>
-          <div className="flex min-h-dvh">
-            <Sidebar />
-            <main className="flex-1 p-6">{children}</main>
-          </div>
-        </NextIntlClientProvider>
+        <NextIntlClientProvider>{children}</NextIntlClientProvider>
       </body>
     </html>
   );

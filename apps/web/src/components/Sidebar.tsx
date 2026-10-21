@@ -1,5 +1,6 @@
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/routing';
+import { SignOutButton } from './auth/SignOutButton';
 import { LocaleSwitch } from './LocaleSwitch';
 import { ThemeToggle } from './ThemeToggle';
 
@@ -36,7 +37,10 @@ export function Sidebar() {
           ))}
         </ul>
       </nav>
-      <div className="mt-auto flex gap-2 pt-6">
+      <div className="mt-auto pt-6">
+        <SignOutButton />
+      </div>
+      <div className="flex gap-2 pt-2">
         <LocaleSwitch />
         <ThemeToggle />
       </div>

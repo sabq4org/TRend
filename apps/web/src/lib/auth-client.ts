@@ -59,11 +59,23 @@ export const verifyBackupCode = (code: string) => post('/two-factor/verify-backu
 export const enableTwoFactor = (password: string) =>
   post<{ totpURI: string; backupCodes: string[] }>('/two-factor/enable', { password });
 
-/** رمز وصول (15 دقيقة) من الجلسة الحالية؛ كل طلب يدوّر رمز الجلسة. */
-export async function accessToken(): Promise<string> {
-  const { token } = await call<{ token: string }>(`${AUTH}/token`);
-  return token;
+let pendingToken: Promise<string> | null = null;
+
+/**
+ * رمز وصول (15 دقيقة) من الجلسة الحالية؛ كل طلب يدوّر رمز الجلسة.
+ * الطلبات المتزامنة تتشارك طلباً واحداً: طلبان بالكوكي نفسه يجعلان الثاني يبدو إعادة استخدام.
+ */
+export function accessToken(): Promise<string> {
+  pendingToken ??= call<{ token: string }>(`${AUTH}/token`)
+    .then(({ token }) => token)
+    .finally(() => {
+      pendingToken = null;
+    });
+  return pendingToken;
 }
+
+/** يُنهي الجلسة الحالية على الخادم ويحذف كوكيها. */
+export const signOut = () => post('/sign-out', {});
 
 export interface Me {
   id: string;
@@ -82,8 +94,25 @@ export const acceptInvitation = (token: string, password: string) =>
     body: JSON.stringify({ token, password }),
   });
 
+/**
+ * الصفحة التي طلبها المستخدم قبل تحويله للدخول (?next=). تُقبل المسارات الداخلية فقط،
+ * فلا يصلح الرابط لإعادة التوجيه إلى موقع آخر.
+ */
+export function requestedPath(): string | null {
+  if (typeof window === 'undefined') return null;
+  const next = new URLSearchParams(window.location.search).get('next');
+  if (!next || !next.startsWith('/') || next.startsWith('//') || next.includes('\\')) return null;
+  return next;
+}
+
+/** يضيف ?next= إلى مسار من شاشات الدخول إن كان المستخدم قادماً من صفحة محمية. */
+export function withRequestedPath(path: string): string {
+  const next = requestedPath();
+  return next ? `${path}?next=${encodeURIComponent(next)}` : path;
+}
+
 /** §9.2: المالك والمشرف بلا مصادقة ثنائية يُوجَّهان لتفعيلها قبل أي شيء آخر. */
-export async function nextPathAfterSignIn(): Promise<'/' | '/setup-mfa'> {
+export async function nextPathAfterSignIn(): Promise<string> {
   const profile = await me();
-  return profile.mfaRequired ? '/setup-mfa' : '/';
+  return profile.mfaRequired ? '/setup-mfa' : (requestedPath() ?? '/');
 }

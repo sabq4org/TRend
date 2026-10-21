@@ -1,9 +1,10 @@
 # وثائق ترند TRend
 
-| الملف | الوصف |
-|---|---|
-| [spec/trend-technical-spec.md](spec/trend-technical-spec.md) | كراسة المواصفات الفنية (نسخة Markdown للقراءة والبحث) |
-| [spec/trend-technical-spec.docx](spec/trend-technical-spec.docx) | كراسة المواصفات الفنية (الأصل المعتمد) |
+| الملف                                                            | الوصف                                                                                  |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| [spec/trend-technical-spec.md](spec/trend-technical-spec.md)     | كراسة المواصفات الفنية (نسخة Markdown للقراءة والبحث)                                  |
+| [spec/trend-technical-spec.docx](spec/trend-technical-spec.docx) | كراسة المواصفات الفنية (الأصل المعتمد)                                                 |
+| [phase-2-foundation.md](phase-2-foundation.md)                   | المرحلة 2 «الأساس»: ما نُفّذ، والتتبع للمتطلبات، والقرارات الافتراضية، والتشغيل المحلي |
 
 ## قواعد العمل
 

@@ -1,0 +1,46 @@
+{
+  "name": "trend",
+  "private": true,
+  "description": "ترند TRend — نظام إدارة الأداء والعمليات",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:migrate": "pnpm --filter @trend/db migrate",
+    "i18n:check": "pnpm --filter @trend/i18n check",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "@eslint/js": "^9.35.0",
+    "eslint": "^9.35.0",
+    "husky": "^9.1.7",
+    "prettier": "^3.6.2",
+    "turbo": "^2.5.6",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.43.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "postcss@<8.5.18": "^8.5.18"
+    },
+    "auditConfig": {
+      "ignoreCves": [
+        "CVE-2026-85393",
+        "CVE-2026-93687",
+        "CVE-2026-97058",
+        "CVE-2025-71329",
+        "CVE-2025-71330"
+      ]
+    }
+  }
+}

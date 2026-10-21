@@ -1,0 +1,4 @@
+docs/spec/
+pnpm-lock.yaml
+.next/
+dist/

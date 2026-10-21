@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "ترند",
+    "slug": "trend",
+    "scheme": "trend",
+    "version": "0.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "bundleIdentifier": "sa.trend.app",
+      "supportsTablet": true,
+      "infoPlist": { "CFBundleAllowMixedLocalizations": true }
+    },
+    "android": { "package": "sa.trend.app" },
+    "extra": { "supportsRTL": true },
+    "plugins": ["expo-router", "expo-localization"],
+    "experiments": { "typedRoutes": true }
+  }
+}

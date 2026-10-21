@@ -7,7 +7,9 @@ import { PasswordField } from '@/components/auth/PasswordField';
 import { useRouter } from '@/i18n/routing';
 import { acceptInvitation, AuthError, nextPathAfterSignIn, signIn } from '@/lib/auth-client';
 
+// يطابق acceptInvitationSchema في الخادم.
 const MIN_LENGTH = 10;
+const MAX_LENGTH = 128;
 
 // FR-ORG-03: قبول الدعوة بتعيين كلمة المرور، ثم الدخول مباشرة.
 export function AcceptInvite({ token }: { token: string }) {
@@ -18,7 +20,7 @@ export function AcceptInvite({ token }: { token: string }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const longEnough = password.length >= MIN_LENGTH;
+  const longEnough = password.length >= MIN_LENGTH && password.length <= MAX_LENGTH;
   const matches = longEnough && password === confirm;
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
@@ -26,10 +28,9 @@ export function AcceptInvite({ token }: { token: string }) {
     if (!matches) return;
     setBusy(true);
     setError(null);
+    let email: string;
     try {
-      const { email } = await acceptInvitation(token, password);
-      const { twoFactor } = await signIn(email, password);
-      router.push(twoFactor ? '/login/two-factor' : await nextPathAfterSignIn());
+      ({ email } = await acceptInvitation(token, password));
     } catch (err) {
       const kind = err instanceof AuthError ? err.kind : 'unexpected';
       setError(
@@ -42,6 +43,14 @@ export function AcceptInvite({ token }: { token: string }) {
               : t('unexpected'),
       );
       setBusy(false);
+      return;
+    }
+    // الدعوة استُهلكت والحساب مفعّل؛ إن تعثّر الدخول التلقائي فشاشة الدخول هي الطريق.
+    try {
+      const { twoFactor } = await signIn(email, password);
+      router.push(twoFactor ? '/login/two-factor' : await nextPathAfterSignIn());
+    } catch {
+      router.push('/login');
     }
   }
 
@@ -63,6 +72,7 @@ export function AcceptInvite({ token }: { token: string }) {
         label={t('invite.newPassword')}
         required
         minLength={MIN_LENGTH}
+        maxLength={MAX_LENGTH}
         autoComplete="new-password"
         aria-describedby="password-rules"
         value={password}
@@ -73,6 +83,7 @@ export function AcceptInvite({ token }: { token: string }) {
         name="confirm"
         label={t('invite.confirm')}
         required
+        maxLength={MAX_LENGTH}
         autoComplete="new-password"
         value={confirm}
         onChange={(e) => setConfirm(e.target.value)}

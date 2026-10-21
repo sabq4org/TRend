@@ -181,3 +181,17 @@ test('a used invitation link explains what to do', async ({ page }) => {
   await page.getByRole('button', { name: 'تفعيل الحساب' }).click();
   await expect(alert(page)).toHaveText('رابط الدعوة غير صالح أو منتهٍ أو مستخدم.');
 });
+
+test('if sign-in fails after the invitation is accepted, the user is sent to sign in', async ({
+  page,
+}) => {
+  await mockApi(page, {
+    '/api/v1/invitations/accept': { body: { email: 'hind@trend.sa' } },
+    '/api/v1/auth/sign-in/email': { status: 500 },
+  });
+  await page.goto('/ar/invite/tok_456');
+  await page.getByLabel('كلمة المرور', { exact: true }).fill('a-long-password');
+  await page.getByLabel('تأكيد كلمة المرور').fill('a-long-password');
+  await page.getByRole('button', { name: 'تفعيل الحساب' }).click();
+  await expect(page).toHaveURL(/\/ar\/login$/);
+});

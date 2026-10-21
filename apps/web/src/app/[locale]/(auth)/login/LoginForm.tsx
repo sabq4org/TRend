@@ -5,7 +5,7 @@ import { useState, type FormEvent } from 'react';
 import { Alert, primaryButton } from '@/components/auth/Alert';
 import { Locked } from '@/components/auth/Locked';
 import { inputClass, PasswordField } from '@/components/auth/PasswordField';
-import { useRouter } from '@/i18n/routing';
+import { Link, useRouter } from '@/i18n/routing';
 import { AuthError, nextPathAfterSignIn, signIn, withRequestedPath } from '@/lib/auth-client';
 
 // §9.2: الدخول ببريد العمل وكلمة المرور؛ القفل بعد 5 محاولات يظهر بمدة متبقية.
@@ -74,6 +74,12 @@ export function LoginForm() {
         required
         autoComplete="current-password"
       />
+      <Link
+        href="/forgot-password"
+        className="-mt-2 self-start py-1 text-sm font-medium text-primary"
+      >
+        {t('forgot.link')}
+      </Link>
 
       <button type="submit" disabled={busy} aria-busy={busy} className={primaryButton}>
         {t('login.submit')}

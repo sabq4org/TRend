@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
+import { Link } from '@/i18n/routing';
 
 /** §9.2: الحساب مقفل 15 دقيقة بعد 5 محاولات خاطئة؛ عدّاد تنازلي حتى انتهاء القفل. */
 export function Locked({
@@ -51,14 +52,22 @@ export function Locked({
         {clock}
       </div>
       <p className="m-0 text-sm leading-loose text-fg-muted">{t('locked.hint')}</p>
-      <button
-        type="button"
-        onClick={onBack}
-        disabled={left > 0}
-        className="flex h-12 items-center rounded-[10px] px-6 text-[15px] font-semibold text-primary disabled:text-fg-muted"
-      >
-        {t('backToLogin')}
-      </button>
+      <div className="flex flex-wrap justify-center gap-3">
+        <Link
+          href="/forgot-password"
+          className="flex h-12 items-center rounded-[10px] border border-border px-6 text-[15px] font-semibold"
+        >
+          {t('locked.forgot')}
+        </Link>
+        <button
+          type="button"
+          onClick={onBack}
+          disabled={left > 0}
+          className="flex h-12 items-center rounded-[10px] px-6 text-[15px] font-semibold text-primary disabled:text-fg-muted"
+        >
+          {t('backToLogin')}
+        </button>
+      </div>
     </div>
   );
 }

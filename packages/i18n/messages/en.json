@@ -77,7 +77,8 @@
     "locked": {
       "title": "Sign-in paused for now",
       "body": "A wrong password was entered 5 times for this account. To protect it, you can try again in:",
-      "hint": "If this wasn't you, let your workspace admin know."
+      "hint": "If this wasn't you, let your workspace admin know.",
+      "forgot": "Forgot password"
     },
     "twoFactor": {
       "title": "Enter your verification code",
@@ -116,9 +117,6 @@
       "title": "Welcome to TRend",
       "subtitle": "Choose a password to activate your account.",
       "newPassword": "Password",
-      "confirm": "Confirm password",
-      "ruleLength": "At least 10 characters",
-      "ruleMatch": "Both passwords match",
       "submit": "Activate account",
       "note": "This link works once. If it has expired, ask your admin to send it again.",
       "invalid": "This invitation link is invalid, expired or already used.",
@@ -131,6 +129,51 @@
       "offline": "We couldn't reach the server. Check your connection and try again.",
       "retry": "Try again"
     },
-    "signOutFailed": "Couldn't sign out; your session is still active. Try again."
+    "signOutFailed": "Couldn't sign out; your session is still active. Try again.",
+    "forgot": {
+      "link": "Forgot your password?",
+      "title": "Forgot your password?",
+      "subtitle": "Enter your work email and we'll send it a link to set a new password.",
+      "submit": "Send link",
+      "sentTitle": "Check your email",
+      "sentBody": "If <email></email> is registered on TRend, a link will arrive within minutes. It works once within 30 minutes.",
+      "sentHint": "Didn't get it? Check your spam folder, or try again in a minute.",
+      "tooMany": "Too many requests. Try again in a minute."
+    },
+    "reset": {
+      "title": "Set a new password",
+      "subtitle": "Choose a new password for your account. We'll then sign you out on every device.",
+      "submit": "Save password",
+      "invalid": "This reset link is invalid, expired or already used.",
+      "requestNew": "Request a new link",
+      "compromised": "This password has appeared in known breaches. Choose another one.",
+      "doneTitle": "Password changed",
+      "doneBody": "We've signed you out on every device. Sign in now with your new password.",
+      "toLogin": "Go to sign in"
+    },
+    "newPassword": {
+      "label": "New password",
+      "confirm": "Confirm password",
+      "ruleLength": "At least 10 characters",
+      "ruleMatch": "Both passwords match"
+    }
+  },
+  "mail": {
+    "footer": "TRend — every commitment has an owner, a deadline and proof of delivery.",
+    "linkFallback": "If the button doesn't work, copy this link into your browser:",
+    "passwordReset": {
+      "subject": "Reset your TRend password",
+      "greeting": "Hello {name},",
+      "body": "You asked to reset the password for your TRend account. The link works once within {minutes} minutes.",
+      "action": "Set a new password",
+      "ignore": "If you didn't ask for this, ignore this email. Your current password won't change."
+    },
+    "invitation": {
+      "subject": "{inviter} invited you to {workspace} on TRend",
+      "greeting": "Hello {name},",
+      "body": "{inviter} invited you to join the {workspace} workspace as {role}. Choose a password to activate your account.",
+      "action": "Accept invitation",
+      "expiry": "The link works once until {expires}. If it has expired, ask your admin to send it again."
+    }
   }
 }

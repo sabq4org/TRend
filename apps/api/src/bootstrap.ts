@@ -2,14 +2,17 @@ import type { INestApplication } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { toNodeHandler } from 'better-auth/node';
 import express from 'express';
-import { AppModule } from './app.module';
+import { AppModule, type AppOverrides } from './app.module';
 import { AUTH } from './auth/auth.module';
 import { AUTH_BASE_PATH, type Auth } from './auth/better-auth';
 import type { AppConfig } from './config';
 
-export async function createApp(config: AppConfig): Promise<INestApplication> {
+export async function createApp(
+  config: AppConfig,
+  overrides: AppOverrides = {},
+): Promise<INestApplication> {
   // محلل الطلبات يُضاف يدوياً بعد مسار المصادقة: Better Auth يقرأ جسم الطلب بنفسه.
-  const app = await NestFactory.create(AppModule.forRoot(config), {
+  const app = await NestFactory.create(AppModule.forRoot(config, overrides), {
     bodyParser: false,
     logger: config.NODE_ENV === 'test' ? false : undefined,
   });

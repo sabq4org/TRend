@@ -1,0 +1,32 @@
+{
+  "name": "@trend/i18n",
+  "version": "0.0.0",
+  "private": true,
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./messages/ar.json": "./messages/ar.json",
+    "./messages/en.json": "./messages/en.json"
+  },
+  "files": [
+    "dist",
+    "messages"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "check": "node scripts/check-messages.mjs"
+  },
+  "dependencies": {
+    "intl-messageformat": "^10.7.16"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.12"
+  }
+}

@@ -1,0 +1,38 @@
+@import 'tailwindcss';
+@import '@trend/ui/tokens.css';
+
+/* §10.1: رموز التصميم المشتركة تُعرض كألوان Tailwind. */
+@theme inline {
+  --color-bg: var(--color-background);
+  --color-surface: var(--color-surface);
+  --color-surface-muted: var(--color-surface-muted);
+  --color-border: var(--color-border);
+  --color-fg: var(--color-text);
+  --color-fg-muted: var(--color-text-muted);
+  --color-primary: var(--color-primary);
+  --color-on-primary: var(--color-primary-text);
+  --color-overdue: var(--color-status-overdue);
+  --color-high: var(--color-status-high);
+  --color-medium: var(--color-status-medium);
+  --color-done: var(--color-status-done);
+  --font-sans: var(--font-sans);
+}
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+html {
+  /* خط next/font المحمّل محلياً أولاً، ثم سلسلة الرموز. */
+  font-family: var(--font-plex), var(--font-sans);
+  background: var(--color-background);
+  color: var(--color-text);
+}
+
+/* §10.5: احترام إعداد تقليل الحركة. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "name": "@trend/api",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "node --watch -r @swc-node/register src/main.ts",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src test",
+    "test": "vitest run",
+    "seed": "node dist/scripts/seed.js"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.6",
+    "@nestjs/core": "^11.1.6",
+    "@nestjs/platform-express": "^11.1.6",
+    "@node-rs/argon2": "^2.2.2",
+    "@trend/db": "workspace:*",
+    "@trend/i18n": "workspace:*",
+    "@trend/permissions": "workspace:*",
+    "@trend/schemas": "workspace:*",
+    "better-auth": "1.7.12",
+    "express": "^5.2.1",
+    "jose": "^6.1.0",
+    "pg": "^8.16.3",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "^11.1.6",
+    "@swc-node/register": "^1.10.10",
+    "@swc/core": "^1.13.5",
+    "@types/express": "^5.0.3",
+    "@types/node": "^22.18.1",
+    "@types/pg": "^8.15.5",
+    "@types/supertest": "^6.0.3",
+    "supertest": "^7.1.4",
+    "unplugin-swc": "^1.5.7",
+    "vitest": "^4.1.12"
+  }
+}

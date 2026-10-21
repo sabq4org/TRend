@@ -1,0 +1,57 @@
+{
+  "app": {
+    "name": "TRend",
+    "tagline": "Every commitment has an owner, a due date and proof of delivery"
+  },
+  "nav": {
+    "home": "Home",
+    "tasks": "Tasks",
+    "projects": "Projects",
+    "chats": "Chats",
+    "meetings": "Meetings",
+    "notes": "Notes",
+    "performance": "Performance",
+    "calendar": "Calendar",
+    "support": "Support",
+    "settings": "Settings",
+    "quickAdd": "Quick add",
+    "search": "Search"
+  },
+  "common": {
+    "tasksCount": "{count, plural, =0 {No tasks} one {# task} other {# tasks}}",
+    "language": "Language",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "switchLanguage": "العربية",
+    "comingSoon": "Being built in the implementation phases"
+  },
+  "home": {
+    "title": "Welcome to TRend",
+    "emptyTitle": "Nothing here yet",
+    "emptyBody": "Your overdue, today and this-week tasks will appear here once the work core ships."
+  },
+  "roles": {
+    "owner": "Owner",
+    "admin": "Admin",
+    "member": "Member",
+    "guest": "Guest"
+  },
+  "orgUnitTypes": {
+    "sector": "Sector",
+    "department": "Department",
+    "section": "Section",
+    "team": "Team"
+  },
+  "errors": {
+    "unauthorized": "Please sign in to continue",
+    "forbidden": "You are not allowed to perform this action",
+    "notFound": "The requested item was not found",
+    "validation": "The submitted data is invalid",
+    "conflict": "Conflicts with existing data",
+    "internal": "An unexpected error occurred",
+    "mfaRequired": "Two-factor authentication must be enabled on your account to continue",
+    "invalidInvitation": "The invitation link is invalid, expired or already used",
+    "accountLocked": "Too many failed attempts. Try again in 15 minutes"
+  }
+}

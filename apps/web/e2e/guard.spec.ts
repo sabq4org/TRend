@@ -20,6 +20,12 @@ test('without a session the app sends you to the login screen and shows nothing 
   await expect(page.getByRole('navigation')).toHaveCount(0);
 });
 
+test('the requested page keeps its query parameters on the way to login', async ({ page }) => {
+  await mockApi(page, noSession);
+  await page.goto('/ar?welcome=1');
+  await expect(page).toHaveURL(/\/ar\/login\?next=%2F%3Fwelcome%3D1$/);
+});
+
 test('after signing in you return to the page you asked for', async ({ page }) => {
   await mockApi(page, {
     '/api/v1/auth/sign-in/email': { body: { token: 'session' } },
@@ -46,6 +52,18 @@ test('an admin without 2FA is sent to set it up before using the app', async ({ 
   await expect(page).toHaveURL(/\/ar\/setup-mfa$/);
 });
 
+test('an admin who signs in without 2FA keeps the requested page through setup', async ({
+  page,
+}) => {
+  await mockApi(page, {
+    '/api/v1/auth/sign-in/email': { body: { token: 'session' } },
+    ...signedIn(true),
+  });
+  await page.goto('/ar/login?next=%2F%3Fwelcome%3D1');
+  await fillLogin(page);
+  await expect(page).toHaveURL(/\/ar\/setup-mfa\?next=%2F%3Fwelcome%3D1$/);
+});
+
 test('when the server is unreachable the app offers a retry instead of the login screen', async ({
   page,
 }) => {
@@ -68,4 +86,12 @@ test('signing out ends the session and returns to the login screen', async ({ pa
   await page.getByRole('button', { name: 'تسجيل الخروج' }).click();
   await expect(page).toHaveURL(/\/ar\/login$/);
   expect(calls.map((c) => c.path)).toContain('/api/v1/auth/sign-out');
+});
+
+test('a failed sign-out says so and stays in the app', async ({ page }) => {
+  await mockApi(page, { ...signedIn(false), '/api/v1/auth/sign-out': { status: 503 } });
+  await page.goto('/ar');
+  await page.getByRole('button', { name: 'تسجيل الخروج' }).click();
+  await expect(page.getByText('تعذّر تسجيل الخروج')).toBeVisible();
+  await expect(page).toHaveURL(/\/ar$/);
 });

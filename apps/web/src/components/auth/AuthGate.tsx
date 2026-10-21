@@ -20,22 +20,28 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [state, setState] = useState<State>('checking');
 
+  // الصفحة المطلوبة بمعاملاتها، دون بادئة اللغة التي يضيفها الموجّه.
+  const returnTo = useCallback(() => {
+    const next = pathname + window.location.search;
+    return next === '/' ? {} : { next };
+  }, [pathname]);
+
   const check = useCallback(() => {
     setState('checking');
     me().then(
       (profile) => {
-        if (profile.mfaRequired) router.replace('/setup-mfa');
+        if (profile.mfaRequired) router.replace({ pathname: '/setup-mfa', query: returnTo() });
         else setState('ready');
       },
       (err: unknown) => {
         if (err instanceof AuthError && (err.status === 401 || err.kind === 'noAccess')) {
-          router.replace({ pathname: '/login', query: pathname === '/' ? {} : { next: pathname } });
+          router.replace({ pathname: '/login', query: returnTo() });
         } else {
           setState('offline');
         }
       },
     );
-  }, [router, pathname]);
+  }, [router, returnTo]);
 
   useEffect(check, [check]);
 

@@ -114,5 +114,5 @@ export function withRequestedPath(path: string): string {
 /** §9.2: المالك والمشرف بلا مصادقة ثنائية يُوجَّهان لتفعيلها قبل أي شيء آخر. */
 export async function nextPathAfterSignIn(): Promise<string> {
   const profile = await me();
-  return profile.mfaRequired ? '/setup-mfa' : (requestedPath() ?? '/');
+  return profile.mfaRequired ? withRequestedPath('/setup-mfa') : (requestedPath() ?? '/');
 }

@@ -130,6 +130,7 @@
       "checking": "Checking your session…",
       "offline": "We couldn't reach the server. Check your connection and try again.",
       "retry": "Try again"
-    }
+    },
+    "signOutFailed": "Couldn't sign out; your session is still active. Try again."
   }
 }

@@ -1,21 +1,17 @@
-import {
-  Inject,
-  Injectable,
-  SetMetadata,
-  type CanActivate,
-  type ExecutionContext,
-} from '@nestjs/common';
+import { Injectable, SetMetadata, type CanActivate, type ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
-import { APP_CONFIG, type AppConfig } from '../config';
-import { unauthorized } from '../common/problem';
+import { mfaRequired, unauthorized } from '../common/problem';
 import { TenantDb } from '../database/database.module';
 import type { Principal } from './principal';
-import { verifyAccessToken } from './tokens';
+import { AccessTokenVerifier } from './tokens';
 
 const IS_PUBLIC = 'trend:isPublic';
-/** يُستثنى من المصادقة (الفحص الصحي فقط حالياً). */
+const ALLOW_WITHOUT_MFA = 'trend:allowWithoutMfa';
+/** يُستثنى من المصادقة (الفحص الصحي وقبول الدعوة). */
 export const Public = () => SetMetadata(IS_PUBLIC, true);
+/** متاح للمالك أو المشرف قبل تفعيل المصادقة الثنائية، ليعرف أن عليه تفعيلها. */
+export const AllowWithoutMfa = () => SetMetadata(ALLOW_WITHOUT_MFA, true);
 
 /** الحارس الافتراضي لكل نقطة نهاية: لا وصول دون رمز صالح لمستخدم نشط في مستأجره. */
 @Injectable()
@@ -23,7 +19,7 @@ export class AuthGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly db: TenantDb,
-    @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly verifier: AccessTokenVerifier,
   ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
@@ -37,16 +33,25 @@ export class AuthGuard implements CanActivate {
 
     let claims;
     try {
-      claims = await verifyAccessToken(token, this.config);
+      claims = await this.verifier.verify(token);
     } catch {
       throw unauthorized();
     }
+
+    // §9.2: المصادقة الثنائية إلزامية للمالك والمشرفين.
+    const allowWithoutMfa = this.reflector.getAllAndOverride<boolean>(ALLOW_WITHOUT_MFA, [
+      ctx.getHandler(),
+      ctx.getClass(),
+    ]);
+    if (claims.priv && !claims.mfa && !allowWithoutMfa) throw mfaRequired();
 
     const principal: Principal = {
       userId: claims.sub,
       tenantId: claims.tid,
       ip: req.ip ?? null,
       source: 'api',
+      privileged: claims.priv,
+      mfa: claims.mfa,
     };
     // الاستعلام يمر عبر RLS: مستخدم من مستأجر آخر لا يُعثر عليه أصلاً.
     const active = await this.db.run(principal, async (_db, c) => {

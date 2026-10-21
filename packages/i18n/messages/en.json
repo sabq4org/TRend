@@ -49,6 +49,8 @@
     "notFound": "The requested item was not found",
     "validation": "The submitted data is invalid",
     "conflict": "Conflicts with existing data",
-    "internal": "An unexpected error occurred"
+    "internal": "An unexpected error occurred",
+    "mfaRequired": "Two-factor authentication must be enabled on your account to continue",
+    "invalidInvitation": "The invitation link is invalid, expired or already used"
   }
 }

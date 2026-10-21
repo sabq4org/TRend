@@ -50,6 +50,15 @@ export class WorkspacesController {
     return this.service.inviteMember(p, workspaceId, body);
   }
 
+  @Post('members/:membershipId/invitation')
+  reissueInvitation(
+    @CurrentPrincipal() p: Principal,
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('membershipId', ParseUUIDPipe) membershipId: string,
+  ) {
+    return this.service.reissueInvitation(p, workspaceId, membershipId);
+  }
+
   @Get('audit-events')
   listAuditEvents(
     @CurrentPrincipal() p: Principal,

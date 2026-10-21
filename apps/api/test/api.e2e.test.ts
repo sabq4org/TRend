@@ -7,9 +7,11 @@ import {
   type ProvisionResult,
   type TestDatabase,
 } from '@trend/db';
+import { generateKeyPair, SignJWT } from 'jose';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { signAccessToken } from '../src/auth/tokens';
+import { AUTH } from '../src/auth/auth.module';
+import { issueAccessToken } from '../src/auth/tokens';
 import { createApp } from '../src/bootstrap';
 import { loadConfig, type AppConfig } from '../src/config';
 
@@ -22,7 +24,9 @@ let A: ProvisionResult;
 let B: ProvisionResult;
 const users: Record<string, string> = {};
 
-const token = (sub: string, tid = A.tenantId) => signAccessToken({ sub, tid }, config);
+// الصلاحيات تُختبر هنا بمعزل عن المصادقة الثنائية (mfa: true)؛ مسار الدخول في auth.e2e.test.ts.
+const token = (sub: string, tid = A.tenantId) =>
+  issueAccessToken(app.get(AUTH), { sub, tid, priv: false, mfa: true });
 const api = () => request(app.getHttpServer());
 const as = async (user: string, tid?: string) => ({
   Authorization: `Bearer ${await token(user, tid)}`,
@@ -62,7 +66,8 @@ beforeAll(async () => {
   config = loadConfig({
     NODE_ENV: 'test',
     DATABASE_URL: db.appUrl,
-    JWT_SECRET: 'test-secret-test-secret-test-secret-123',
+    AUTH_DATABASE_URL: db.authUrl,
+    BETTER_AUTH_SECRET: 'test-secret-test-secret-test-secret-123',
   });
   A = await provisionTenant(db.adminPool, {
     tenantName: 'ترند',
@@ -115,18 +120,25 @@ describe('authentication', () => {
   });
 
   it('rejects a token signed with another key', async () => {
-    const forged = await signAccessToken(
-      { sub: A.ownerUserId, tid: A.tenantId },
-      {
-        ...config,
-        JWT_SECRET: 'another-secret-another-secret-another-1',
-      },
-    );
+    const { privateKey } = await generateKeyPair('EdDSA', { crv: 'Ed25519' });
+    const forged = await new SignJWT({ tid: A.tenantId, priv: true, mfa: true })
+      .setProtectedHeader({ alg: 'EdDSA' })
+      .setSubject(A.ownerUserId)
+      .setIssuer(config.JWT_ISSUER)
+      .setAudience(config.JWT_AUDIENCE)
+      .setExpirationTime('5m')
+      .sign(privateKey);
     await api().get('/api/v1/me').set('Authorization', `Bearer ${forged}`).expect(401);
   });
 
   it('rejects an expired token', async () => {
-    const expired = await signAccessToken({ sub: A.ownerUserId, tid: A.tenantId }, config, -10);
+    const expired = await issueAccessToken(app.get(AUTH), {
+      sub: A.ownerUserId,
+      tid: A.tenantId,
+      priv: true,
+      mfa: true,
+      exp: Math.floor(Date.now() / 1000) - 10,
+    });
     await api().get('/api/v1/me').set('Authorization', `Bearer ${expired}`).expect(401);
   });
 

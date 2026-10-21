@@ -37,6 +37,9 @@ export const forbidden = () => new ProblemException(HttpStatus.FORBIDDEN, 'forbi
 export const notFound = () => new ProblemException(HttpStatus.NOT_FOUND, 'notFound');
 export const unauthorized = () => new ProblemException(HttpStatus.UNAUTHORIZED, 'unauthorized');
 export const conflict = () => new ProblemException(HttpStatus.CONFLICT, 'conflict');
+export const mfaRequired = () => new ProblemException(HttpStatus.FORBIDDEN, 'mfaRequired');
+export const invalidInvitation = () =>
+  new ProblemException(HttpStatus.BAD_REQUEST, 'invalidInvitation');
 
 export function toProblem(status: number, code: ErrorCode, errors?: Problem['errors']): Problem {
   return {

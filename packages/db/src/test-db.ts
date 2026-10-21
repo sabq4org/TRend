@@ -11,6 +11,8 @@ export interface TestDatabase {
   appPool: Pool;
   adminUrl: string;
   appUrl: string;
+  /** دور Better Auth (مخطط auth فقط). */
+  authUrl: string;
   drop(): Promise<void>;
 }
 
@@ -30,6 +32,7 @@ export async function createTestDatabase(): Promise<TestDatabase> {
   const suffix = randomBytes(4).toString('hex');
   const name = `trend_test_${suffix}`;
   const appUser = { name: `trend_test_app_${suffix}`, password: randomBytes(12).toString('hex') };
+  const authUser = { name: `trend_test_auth_${suffix}`, password: randomBytes(12).toString('hex') };
 
   const root = new Client({ connectionString: rootUrl });
   await root.connect();
@@ -44,9 +47,13 @@ export async function createTestDatabase(): Promise<TestDatabase> {
   await admin.query(
     `CREATE ROLE ${appUser.name} LOGIN PASSWORD '${appUser.password}' NOSUPERUSER NOBYPASSRLS IN ROLE trend_app`,
   );
+  await admin.query(
+    `CREATE ROLE ${authUser.name} LOGIN PASSWORD '${authUser.password}' NOSUPERUSER NOBYPASSRLS IN ROLE trend_auth`,
+  );
   await admin.end();
 
   const appUrl = withDatabase(rootUrl, name, appUser);
+  const authUrl = withDatabase(rootUrl, name, authUser);
   const adminPool = new Pool({ connectionString: adminUrl, max: 4 });
   const appPool = new Pool({ connectionString: appUrl, max: 8 });
 
@@ -56,6 +63,7 @@ export async function createTestDatabase(): Promise<TestDatabase> {
     appPool,
     adminUrl,
     appUrl,
+    authUrl,
     async drop() {
       await appPool.end();
       await adminPool.end();
@@ -63,6 +71,7 @@ export async function createTestDatabase(): Promise<TestDatabase> {
       await c.connect();
       await c.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
       await c.query(`DROP ROLE IF EXISTS ${appUser.name}`);
+      await c.query(`DROP ROLE IF EXISTS ${authUser.name}`);
       await c.end();
     },
   };

@@ -92,6 +92,13 @@ export const inviteMemberSchema = z
   });
 export type InviteMemberInput = z.infer<typeof inviteMemberSchema>;
 
+/** FR-ORG-03 / §9.2: قبول الدعوة بتعيين كلمة مرور (10 أحرف على الأقل). */
+export const acceptInvitationSchema = z.object({
+  token: z.string().min(20).max(200),
+  password: z.string().min(10).max(128),
+});
+export type AcceptInvitationInput = z.infer<typeof acceptInvitationSchema>;
+
 /** §8.1: صيغة الأخطاء RFC 9457 برمز ثابت ورسالة عربية وإنجليزية. */
 export const problemSchema = z.object({
   type: z.string(),

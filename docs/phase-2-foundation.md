@@ -61,8 +61,8 @@
 
 ## المتبقي من المرحلة 2
 
-- وحدة الهوية: تسجيل الدخول، Argon2id، رمز التجديد الدوّار، TOTP الإلزامي للمالك والمشرفين،
-  القفل بعد 5 محاولات، الأجهزة النشطة، SSO مع Google وMicrosoft (§9.2).
+- ~~وحدة الهوية~~: أُنجزت في الدفعة الثانية، انظر [phase-2-identity.md](phase-2-identity.md).
+  يبقى منها SSO مع Google وMicrosoft واستعادة كلمة المرور بالبريد.
 - الملفات: تخزين S3 بروابط موقّعة، فحص ClamAV، جدول `files`.
 - الاستيراد الجماعي من CSV وإرسال بريد الدعوة (FR-ORG-03).
 - العامل الخلفي لتوزيع صندوق الأحداث (§5.2) بدور مستقل.
@@ -77,8 +77,7 @@ docker compose up -d postgres
 pnpm install
 pnpm build
 pnpm db:migrate
-pnpm --filter @trend/api seed           # يطبع tenantId وownerUserId
-pnpm --filter @trend/api dev:token <ownerUserId> <tenantId>
+pnpm --filter @trend/api seed           # المالك owner@trend.local بكلمة مرور تطوير
 pnpm --filter @trend/api start          # http://localhost:4000/api/v1/health
 pnpm --filter @trend/web dev            # http://localhost:3000
 ```

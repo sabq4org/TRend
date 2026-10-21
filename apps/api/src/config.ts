@@ -5,7 +5,18 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().default(4000),
   DATABASE_URL: z.string().url(),
-  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
+  /** دور Better Auth: يصل إلى مخطط auth وحده. */
+  AUTH_DATABASE_URL: z.string().url(),
+  BETTER_AUTH_SECRET: z.string().min(32, 'BETTER_AUTH_SECRET must be at least 32 characters'),
+  /** العنوان العام للخادم كما يراه المتصفح (لروابط المصادقة والكوكيز). */
+  AUTH_BASE_URL: z.string().url().default('http://localhost:4000'),
+  /** عنوان تطبيق الويب (لروابط الدعوات). */
+  WEB_URL: z.string().url().default('http://localhost:3000'),
+  /** §9.2: فحص كلمات المرور ضد القوائم المسرّبة (يتصل بخدمة خارجية بإخفاء k-anonymity). */
+  AUTH_CHECK_PWNED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
   JWT_ISSUER: z.string().default('trend'),
   JWT_AUDIENCE: z.string().default('trend-api'),
   CORS_ORIGINS: z

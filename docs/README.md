@@ -1,0 +1,17 @@
+# وثائق ترند TRend
+
+| الملف | الوصف |
+|---|---|
+| [spec/trend-technical-spec.md](spec/trend-technical-spec.md) | كراسة المواصفات الفنية (نسخة Markdown للقراءة والبحث) |
+| [spec/trend-technical-spec.docx](spec/trend-technical-spec.docx) | كراسة المواصفات الفنية (الأصل المعتمد) |
+
+## قواعد العمل
+
+- الكراسة هي المرجع الأساسي لكل تعديل أو إضافة في النظام.
+- يُربط كل تعديل برمز المتطلب: `FR-<الوحدة>-<رقم>` للمتطلبات الوظيفية (القسم 3) أو `NFR-<رقم>` لغير الوظيفية (القسم 13، من NFR-01 إلى NFR-16).
+- الأسئلة والقرارات المعلّقة في الملحق **17.3 «أسئلة مفتوحة تُحسم في التشخيص»** (آخر الكراسة).
+- عند تحديث الكراسة: يُستبدل ملف `.docx` ويُعاد التحويل بالأمر:
+
+```bash
+pandoc docs/spec/trend-technical-spec.docx -t gfm --wrap=none --extract-media=docs/spec/media -o docs/spec/trend-technical-spec.md
+```

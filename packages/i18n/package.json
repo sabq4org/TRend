@@ -27,6 +27,6 @@
     "intl-messageformat": "^10.7.16"
   },
   "devDependencies": {
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.12"
   }
 }

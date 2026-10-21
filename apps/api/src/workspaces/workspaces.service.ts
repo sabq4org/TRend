@@ -1,8 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { CreateOrgUnitInput, InviteMemberInput } from '@trend/schemas';
 import type { Principal } from '../auth/principal';
 import { notFound } from '../common/problem';
+import { APP_CONFIG, type AppConfig } from '../config';
 import { TenantDb } from '../database/database.module';
+import { issueInvitation } from '../invitations/tokens';
 import { loadWorkspaceAccess } from './access';
 
 export interface OrgUnitNode {
@@ -17,7 +19,10 @@ export interface OrgUnitNode {
 
 @Injectable()
 export class WorkspacesService {
-  constructor(private readonly db: TenantDb) {}
+  constructor(
+    private readonly db: TenantDb,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
+  ) {}
 
   /** FR-ORG-01: شجرة الهيكل مرتبة بالمسار، يراها كل عضو غير ضيف. */
   listOrgUnits(p: Principal, workspaceId: string): Promise<OrgUnitNode[]> {
@@ -124,7 +129,31 @@ export class WorkspacesService {
          VALUES (app.current_tenant_id(), 'member.invited', $1)`,
         [{ workspaceId, userId, membershipId: membership!.id, role: input.role }],
       );
-      return { membershipId: membership!.id, userId, role: input.role };
+      const invitation = await issueInvitation(c, this.config.WEB_URL, {
+        id: membership!.id,
+        workspaceId,
+        userId,
+      });
+      return { membershipId: membership!.id, userId, role: input.role, invitation };
+    });
+  }
+
+  /** FR-ORG-03: إعادة إصدار رابط الدعوة لعضو لم يفعّل حسابه بعد (يلغي الرابط السابق). */
+  reissueInvitation(p: Principal, workspaceId: string, membershipId: string) {
+    return this.db.run(p, async (_db, c) => {
+      const access = await loadWorkspaceAccess(c, p, workspaceId);
+      access.require('create', { kind: 'Member', workspaceId });
+      const { rows } = await c.query<{ user_id: string }>(
+        `SELECT m.user_id FROM memberships m JOIN users u ON u.id = m.user_id
+          WHERE m.id = $1 AND m.workspace_id = $2 AND m.deleted_at IS NULL AND u.status = 'invited'`,
+        [membershipId, workspaceId],
+      );
+      if (!rows[0]) throw notFound();
+      return issueInvitation(c, this.config.WEB_URL, {
+        id: membershipId,
+        workspaceId,
+        userId: rows[0].user_id,
+      });
     });
   }
 

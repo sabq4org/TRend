@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
+import { AllowWithoutMfa } from '../auth/auth.guard';
 import { CurrentPrincipal, type Principal } from '../auth/principal';
 import { TenantDb } from '../database/database.module';
 
@@ -6,7 +7,8 @@ import { TenantDb } from '../database/database.module';
 export class MeController {
   constructor(private readonly db: TenantDb) {}
 
-  /** المستخدم الحالي ومساحاته وأدواره. */
+  /** المستخدم الحالي ومساحاته وأدواره، وهل عليه تفعيل المصادقة الثنائية (§9.2). */
+  @AllowWithoutMfa()
   @Get()
   me(@CurrentPrincipal() p: Principal) {
     return this.db.run(p, async (_db, c) => {
@@ -26,7 +28,7 @@ export class MeController {
           ORDER BY w.name`,
         [p.userId],
       );
-      return { ...user, workspaces };
+      return { ...user, workspaces, mfaRequired: p.privileged && !p.mfa };
     });
   }
 }

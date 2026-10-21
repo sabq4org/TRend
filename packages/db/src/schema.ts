@@ -50,6 +50,8 @@ export const users = pgTable('users', {
   timezone: text('timezone').notNull(),
   numeralSystem: text('numeral_system').$type<'arab' | 'latn'>().notNull(),
   status: text('status').$type<'invited' | 'active' | 'suspended' | 'deactivated'>().notNull(),
+  /** هوية الدخول في auth."user" (Better Auth)، تُضبط عند قبول الدعوة. */
+  authUserId: uuid('auth_user_id'),
   deletedAt: tstz('deleted_at'),
 });
 
@@ -126,6 +128,17 @@ export const auditEvents = pgTable('audit_events', {
   occurredAt: tstz('occurred_at').notNull(),
   prevHash: bytea('prev_hash'),
   hash: bytea('hash').notNull(),
+});
+
+/** FR-ORG-03: رابط دعوة لمرة واحدة؛ يُخزن تجزئة الرمز فقط. */
+export const invitations = pgTable('invitations', {
+  ...tenantScoped,
+  workspaceId: uuid('workspace_id').notNull(),
+  membershipId: uuid('membership_id').notNull(),
+  userId: uuid('user_id').notNull(),
+  tokenHash: bytea('token_hash').notNull(),
+  expiresAt: tstz('expires_at').notNull(),
+  acceptedAt: tstz('accepted_at'),
 });
 
 export const outboxEvents = pgTable('outbox_events', {

@@ -6,6 +6,9 @@ export interface Principal {
   tenantId: string;
   ip: string | null;
   source: 'api' | 'mcp';
+  /** مالك أو مشرف في مساحة ما (§9.2: المصادقة الثنائية إلزامية له). */
+  privileged: boolean;
+  mfa: boolean;
 }
 
 export const CurrentPrincipal = createParamDecorator(

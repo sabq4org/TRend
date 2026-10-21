@@ -20,6 +20,7 @@ const TENANT_TABLES = [
   'work_calendars',
   'audit_events',
   'outbox_events',
+  'invitations',
 ];
 
 beforeAll(async () => {
@@ -36,6 +37,11 @@ beforeAll(async () => {
       await c.query(
         `INSERT INTO membership_org_units (tenant_id, workspace_id, membership_id, org_unit_id) VALUES ($1, $2, $3, $4)`,
         [t.tenantId, t.workspaceId, m!.id, unit],
+      );
+      await c.query(
+        `INSERT INTO invitations (tenant_id, workspace_id, membership_id, user_id, token_hash, expires_at)
+         SELECT tenant_id, workspace_id, id, user_id, gen_random_bytes(32), now() + interval '1 day'
+           FROM memberships WHERE role = 'member'`,
       );
       await c.query(
         `INSERT INTO outbox_events (tenant_id, topic, payload) VALUES ($1, 'x', '{}')`,
@@ -80,6 +86,17 @@ describe('schema guarantees', () => {
       .map((r) => r.t)
       .filter((t) => ![...TENANT_TABLES, 'tenants', 'schema_migrations'].includes(t));
     expect(unscoped).toEqual([]);
+  });
+
+  it('the application role cannot assume the lookup or auth roles', async () => {
+    const { rows } = await db.appPool.query<{ lookup: boolean; auth: boolean }>(
+      `SELECT pg_has_role(current_user, 'trend_lookup', 'USAGE') AS lookup,
+              pg_has_role(current_user, 'trend_auth', 'USAGE') AS auth`,
+    );
+    expect(rows[0]).toEqual({ lookup: false, auth: false });
+    await expect(db.appPool.query(`SELECT count(*) FROM auth."account"`)).rejects.toThrow(
+      /permission denied/,
+    );
   });
 
   it('the application role cannot bypass RLS', async () => {

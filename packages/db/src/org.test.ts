@@ -194,3 +194,47 @@ describe('work calendars (FR-ORG-05)', () => {
     ).rejects.toThrow(/check constraint/);
   });
 });
+
+describe('cross-tenant lookups (§9.2)', () => {
+  it('resolve_login maps an identity to its active user and tenant only', async () => {
+    const identity = (
+      await db.adminPool.query<{ id: string }>(
+        `INSERT INTO auth."user" (name, email, "emailVerified") VALUES ('x', 'login@trend.sa', true) RETURNING id`,
+      )
+    ).rows[0]!.id;
+    const u = await addUser(db.appPool, A, 'login@trend.sa', 'admin');
+    await q(`UPDATE users SET auth_user_id = $1 WHERE id = $2`, [identity, u]);
+
+    const resolve = async () =>
+      (await db.appPool.query(`SELECT * FROM app.resolve_login($1)`, [identity])).rows;
+
+    // المستخدم المدعو لم يفعّل حسابه بعد.
+    expect(await resolve()).toEqual([]);
+    await q(`UPDATE users SET status = 'active' WHERE id = $1`, [u]);
+    expect(await resolve()).toEqual([{ user_id: u, tenant_id: A.tenantId, privileged: true }]);
+  });
+
+  it('find_invitation returns only the tenant of a live token', async () => {
+    const u = await addUser(db.appPool, A, 'invitee@trend.sa');
+    const [inv] = await q<{ hash: Buffer }>(
+      `INSERT INTO invitations (tenant_id, workspace_id, membership_id, user_id, token_hash, expires_at)
+       SELECT tenant_id, workspace_id, id, user_id, gen_random_bytes(32), now() + interval '1 hour'
+         FROM memberships WHERE user_id = $1 RETURNING token_hash AS hash`,
+      [u],
+    );
+    const find = async (h: Buffer) =>
+      (await db.appPool.query(`SELECT * FROM app.find_invitation($1)`, [h])).rows;
+    expect(await find(inv!.hash)).toEqual([{ tenant_id: A.tenantId }]);
+    expect(await find(Buffer.alloc(32))).toEqual([]);
+    await q(`UPDATE invitations SET accepted_at = now() WHERE token_hash = $1`, [inv!.hash]);
+    expect(await find(inv!.hash)).toEqual([]);
+  });
+
+  it('the token hash never reaches the audit log', async () => {
+    const { rows } = await db.adminPool.query(
+      `SELECT after FROM audit_events WHERE entity_type = 'invitations'`,
+    );
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) expect(r.after).not.toHaveProperty('token_hash');
+  });
+});

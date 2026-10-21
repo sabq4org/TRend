@@ -2,7 +2,7 @@ import { Global, Inject, Module, type OnModuleDestroy } from '@nestjs/common';
 import { Pool } from 'pg';
 import { APP_CONFIG, type AppConfig } from '../config';
 import { PG_POOL } from '../database/database.module';
-import { createAuth, type Auth } from './better-auth';
+import { createAuth, settleAuthBackgroundTasks, type Auth } from './better-auth';
 import { AccessTokenVerifier } from './tokens';
 
 export const AUTH = Symbol('AUTH');
@@ -40,6 +40,7 @@ export class AuthModule implements OnModuleDestroy {
   constructor(@Inject(AUTH_POOL) private readonly pool: Pool) {}
 
   async onModuleDestroy(): Promise<void> {
+    await settleAuthBackgroundTasks();
     await this.pool.end();
   }
 }

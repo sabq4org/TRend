@@ -3,7 +3,10 @@ import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { setSessionCookie } from 'better-auth/cookies';
 import { bearer, haveIBeenPwned, jwt, twoFactor } from 'better-auth/plugins';
 import type { Pool } from 'pg';
+import { isLocale } from '@trend/i18n';
 import type { AppConfig } from '../config';
+import { enqueueMailAtMostEvery } from '../mail/outbox';
+import { PASSWORD_RESET_TTL_MINUTES } from '../mail/templates';
 import { hashPassword, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, verifyPassword } from './password';
 
 // §6.3: المصادقة بـ Better Auth (قرار المالك في 2026-10-21) داخل الخادم نفسه.
@@ -14,8 +17,22 @@ export const ACCESS_TOKEN_TTL = '15m';
 /** §9.2: قفل الحساب بعد 5 محاولات فاشلة. */
 export const MAX_FAILED_SIGN_INS = 5;
 export const LOCKOUT_SECONDS = 15 * 60;
+/** لا تُرسل أكثر من رسالة استعادة واحدة للبريد نفسه في هذه المدة. */
+const RESET_MAIL_INTERVAL_SECONDS = 60;
 /** مهلة قبول رمز التجديد السابق بعد تدويره، حتى لا تخرج نافذتان تجددان معاً. */
 const ROTATION_GRACE_SECONDS = 30;
+
+const backgroundTasks = new Set<Promise<unknown>>();
+
+function trackBackgroundTask(task: Promise<unknown>) {
+  backgroundTasks.add(task);
+  void task.finally(() => backgroundTasks.delete(task));
+}
+
+/** ينتظر مهام Better Auth الخلفية (كإضافة رسالة الاستعادة). للاختبارات وإيقاف الخادم. */
+export async function settleAuthBackgroundTasks(): Promise<void> {
+  while (backgroundTasks.size) await Promise.allSettled([...backgroundTasks]);
+}
 
 export interface ResolvedLogin {
   userId: string;
@@ -87,6 +104,7 @@ export function createAuth({ config, authPool, appPool }: AuthDeps) {
     telemetry: { enabled: false },
     advanced: {
       database: { generateId: 'uuid' },
+      backgroundTasks: { handler: trackBackgroundTask },
       useSecureCookies: config.NODE_ENV === 'production',
       ipAddress: { ipAddressHeaders: ['x-forwarded-for'] },
     },
@@ -97,7 +115,33 @@ export function createAuth({ config, authPool, appPool }: AuthDeps) {
       minPasswordLength: MIN_PASSWORD_LENGTH,
       maxPasswordLength: MAX_PASSWORD_LENGTH,
       password: { hash: hashPassword, verify: verifyPassword },
+      // §9.2: الاستعادة بالبريد. الرابط لمرة واحدة، وتعيين كلمة مرور جديدة ينهي كل الجلسات.
       revokeSessionsOnPasswordReset: true,
+      resetPasswordTokenExpiresIn: PASSWORD_RESET_TTL_MINUTES * 60,
+      // يعمل في الخلفية (advanced.backgroundTasks أدناه)، فلا يطول الرد لحساب موجود عنه
+      // لبريد غير مسجل، ولا يُعرف وجود الحساب من زمن الاستجابة.
+      sendResetPassword: async ({ user, token }) => {
+        // لا رسالة لحساب موقوف أو لم يفعّل، والرد للطالب واحد في كل الحالات.
+        const { rows } = await appPool.query<{
+          name_ar: string;
+          name_en: string | null;
+          locale: string;
+        }>('SELECT * FROM app.reset_recipient($1)', [user.id]);
+        const r = rows[0];
+        if (!r) return;
+        const locale = isLocale(r.locale) ? r.locale : 'ar';
+        await enqueueMailAtMostEvery(authPool, RESET_MAIL_INTERVAL_SECONDS, user.email, locale, {
+          template: 'password_reset',
+          payload: {
+            name: (locale === 'en' ? r.name_en : null) ?? r.name_ar,
+            url: `${config.WEB_URL.replace(/\/$/, '')}/${locale}/reset-password?token=${encodeURIComponent(token)}`,
+          },
+        });
+      },
+      // إثبات ملكية البريد يفك قفل المحاولات الخاطئة، فيدخل صاحب الحساب فوراً بكلمة مروره الجديدة.
+      onPasswordReset: async ({ user }) => {
+        await recordPasswordAttempt(authPool, user.email, true);
+      },
     },
     session: {
       expiresIn: 60 * 60 * 24 * 30,
@@ -108,7 +152,15 @@ export function createAuth({ config, authPool, appPool }: AuthDeps) {
         mfaVerified: { type: 'boolean', required: false, defaultValue: false, input: false },
       },
     },
-    rateLimit: { enabled: config.NODE_ENV === 'production', window: 60, max: 100 },
+    rateLimit: {
+      enabled: config.NODE_ENV === 'production',
+      window: 60,
+      max: 100,
+      customRules: {
+        '/request-password-reset': { window: 60, max: 3 },
+        '/reset-password': { window: 60, max: 10 },
+      },
+    },
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
         if (ctx.path !== '/sign-in/email') return;

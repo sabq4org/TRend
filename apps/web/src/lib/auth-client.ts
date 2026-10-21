@@ -5,7 +5,14 @@ export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000
 const AUTH = `${API_URL}/api/v1/auth`;
 
 export type AuthErrorKind =
-  'invalid' | 'locked' | 'noAccess' | 'expired' | 'invalidInvitation' | 'unexpected';
+  | 'invalid'
+  | 'locked'
+  | 'noAccess'
+  | 'expired'
+  | 'invalidInvitation'
+  | 'invalidToken'
+  | 'compromised'
+  | 'unexpected';
 
 export class AuthError extends Error {
   constructor(
@@ -40,6 +47,8 @@ async function call<T>(url: string, init: RequestInit = {}): Promise<T> {
   if (code === 'invalidInvitation') throw new AuthError('invalidInvitation', res.status);
   if (code === 'NO_ACTIVE_MEMBERSHIP') throw new AuthError('noAccess', res.status);
   if (code === 'INVALID_TWO_FACTOR_COOKIE') throw new AuthError('expired', res.status);
+  if (code === 'INVALID_TOKEN') throw new AuthError('invalidToken', res.status);
+  if (code === 'PASSWORD_COMPROMISED') throw new AuthError('compromised', res.status);
   if (res.status === 401 || res.status === 400) throw new AuthError('invalid', res.status);
   throw new AuthError('unexpected', res.status);
 }
@@ -73,6 +82,13 @@ export function accessToken(): Promise<string> {
     });
   return pendingToken;
 }
+
+/** §9.2: يرسل رابط الاستعادة إن كان البريد لحساب نشط. الرد واحد في كل الحالات. */
+export const requestPasswordReset = (email: string) => post('/request-password-reset', { email });
+
+/** يعيّن كلمة المرور برمز الرابط، وينهي الخادم كل جلسات الحساب. */
+export const resetPassword = (token: string, newPassword: string) =>
+  post('/reset-password', { token, newPassword });
 
 /** يُنهي الجلسة الحالية على الخادم ويحذف كوكيها. */
 export const signOut = () => post('/sign-out', {});

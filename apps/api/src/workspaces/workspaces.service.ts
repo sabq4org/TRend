@@ -89,7 +89,7 @@ export class WorkspacesService {
 
   /**
    * FR-ORG-03: دعوة بالبريد مع تحديد الدور والقسم في خطوة واحدة.
-   * إرسال البريد يأتي مع وحدة الإشعارات؛ هنا يُكتب حدث member.invited في صندوق الأحداث.
+   * بريد الدعوة يُكتب في صندوق البريد الصادر مع الدعوة، ويُكتب حدث member.invited في صندوق الأحداث.
    */
   inviteMember(p: Principal, workspaceId: string, input: InviteMemberInput) {
     return this.db.run(p, async (_db, c) => {
@@ -129,16 +129,21 @@ export class WorkspacesService {
          VALUES (app.current_tenant_id(), 'member.invited', $1)`,
         [{ workspaceId, userId, membershipId: membership!.id, role: input.role }],
       );
-      const invitation = await issueInvitation(c, this.config.WEB_URL, {
-        id: membership!.id,
-        workspaceId,
-        userId,
-      });
+      const invitation = await issueInvitation(
+        c,
+        this.config.WEB_URL,
+        {
+          id: membership!.id,
+          workspaceId,
+          userId,
+        },
+        p.userId,
+      );
       return { membershipId: membership!.id, userId, role: input.role, invitation };
     });
   }
 
-  /** FR-ORG-03: إعادة إصدار رابط الدعوة لعضو لم يفعّل حسابه بعد (يلغي الرابط السابق). */
+  /** FR-ORG-03: إعادة إصدار رابط الدعوة وإرساله لعضو لم يفعّل حسابه بعد (يلغي الرابط السابق). */
   reissueInvitation(p: Principal, workspaceId: string, membershipId: string) {
     return this.db.run(p, async (_db, c) => {
       const access = await loadWorkspaceAccess(c, p, workspaceId);
@@ -149,11 +154,16 @@ export class WorkspacesService {
         [membershipId, workspaceId],
       );
       if (!rows[0]) throw notFound();
-      return issueInvitation(c, this.config.WEB_URL, {
-        id: membershipId,
-        workspaceId,
-        userId: rows[0].user_id,
-      });
+      return issueInvitation(
+        c,
+        this.config.WEB_URL,
+        {
+          id: membershipId,
+          workspaceId,
+          userId: rows[0].user_id,
+        },
+        p.userId,
+      );
     });
   }
 

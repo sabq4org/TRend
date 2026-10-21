@@ -128,7 +128,7 @@ export class WorkspacesService {
     });
   }
 
-  /** §9.1: سجل التدقيق — المالك كله، والمشرف لنطاقه فقط. */
+  /** §9.1: سجل تدقيق المساحة — المالك كله، والمشرف لنطاقه فقط. أحداث المستأجر العامة خارجه. */
   listAuditEvents(p: Principal, workspaceId: string, limit: number) {
     return this.db.run(p, async (_db, c) => {
       const access = await loadWorkspaceAccess(c, p, workspaceId);
@@ -139,9 +139,9 @@ export class WorkspacesService {
         `SELECT id, seq, actor_id AS "actorId", actor_type AS "actorType", source, action,
                 entity_type AS "entityType", entity_id AS "entityId", occurred_at AS "occurredAt"
            FROM audit_events
-          WHERE ($1::uuid[] IS NULL OR actor_id = ANY($1))
-          ORDER BY seq DESC LIMIT $2`,
-        [scope, limit],
+          WHERE workspace_id = $1 AND ($2::uuid[] IS NULL OR actor_id = ANY($2))
+          ORDER BY seq DESC LIMIT $3`,
+        [workspaceId, scope, limit],
       );
       return rows;
     });

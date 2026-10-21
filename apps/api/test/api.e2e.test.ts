@@ -263,14 +263,54 @@ describe('members (FR-ORG-03, FR-ADM-02)', () => {
 });
 
 describe('audit log (§9.1, NFR-16)', () => {
-  it('owner sees everything, including system provisioning', async () => {
+  it('owner sees everything in the workspace, including system provisioning', async () => {
     const res = await api()
       .get(`/api/v1/workspaces/${A.workspaceId}/audit-events?limit=200`)
       .set(await as(users.owner!))
       .expect(200);
     const actions = res.body.map((e: { action: string }) => e.action);
-    expect(actions).toContain('tenants.created');
+    expect(actions).toContain('workspaces.created');
+    expect(actions).toContain('memberships.created');
     expect(actions).toContain('org_units.created');
+  });
+
+  it('never includes events from another workspace of the same tenant', async () => {
+    const other = await withTenant(
+      db.appPool,
+      { tenantId: A.tenantId, userId: A.ownerUserId },
+      async (_d, c) => {
+        const ws = await c.query(
+          `INSERT INTO workspaces (tenant_id, name) VALUES ($1, 'مساحة ثانية') RETURNING id`,
+          [A.tenantId],
+        );
+        const wsId = ws.rows[0].id as string;
+        await c.query(
+          `INSERT INTO memberships (tenant_id, user_id, workspace_id, role) VALUES ($1, $2, $3, 'owner')`,
+          [A.tenantId, A.ownerUserId, wsId],
+        );
+        const unit = await c.query(
+          `INSERT INTO org_units (tenant_id, workspace_id, type, name_ar, path)
+           VALUES ($1, $2, 'sector', 'سري', '') RETURNING id`,
+          [A.tenantId, wsId],
+        );
+        return { ws: wsId, unit: unit.rows[0].id as string };
+      },
+    );
+    const res = await api()
+      .get(`/api/v1/workspaces/${A.workspaceId}/audit-events?limit=200`)
+      .set(await as(users.owner!))
+      .expect(200);
+    const entities = res.body.map((e: { entityId: string }) => e.entityId);
+    expect(entities).not.toContain(other.ws);
+    expect(entities).not.toContain(other.unit);
+    expect(res.body.map((e: { action: string }) => e.action)).not.toContain('tenants.created');
+
+    // ولا يُقبل قسم من تلك المساحة عند الدعوة.
+    await api()
+      .post(`/api/v1/workspaces/${A.workspaceId}/members`)
+      .set(await as(users.owner!))
+      .send({ email: 'cross@trend.sa', nameAr: 'عابر', role: 'member', orgUnitId: other.unit })
+      .expect(400);
   });
 
   it('admin sees only their own and their reports’ actions', async () => {
@@ -293,7 +333,7 @@ describe('audit log (§9.1, NFR-16)', () => {
 
   it('records API writes with source and actor', async () => {
     const { rows } = await db.adminPool.query(
-      `SELECT actor_id, source FROM audit_events WHERE action = 'org_units.created' AND tenant_id = $1 LIMIT 1`,
+      `SELECT actor_id, source FROM audit_events WHERE action = 'org_units.created' AND tenant_id = $1 ORDER BY seq LIMIT 1`,
       [A.tenantId],
     );
     expect(rows[0]).toEqual({ actor_id: A.ownerUserId, source: 'api' });

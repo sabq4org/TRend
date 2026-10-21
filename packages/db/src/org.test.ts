@@ -99,6 +99,43 @@ describe('memberships (FR-ORG-02, FR-ADM-02)', () => {
   });
 });
 
+describe('workspace consistency', () => {
+  it('rejects units, managers and heads from another workspace of the same tenant', async () => {
+    const [ws2] = await q<{ id: string }>(
+      `INSERT INTO workspaces (tenant_id, name) VALUES (app.current_tenant_id(), 'ثانية') RETURNING id`,
+    );
+    const [foreignUnit] = await q<{ id: string }>(
+      `INSERT INTO org_units (tenant_id, workspace_id, type, name_ar, path)
+       VALUES (app.current_tenant_id(), $1, 'sector', 'قطاع آخر', '') RETURNING id`,
+      [ws2!.id],
+    );
+    const u = await addUser(db.appPool, A, 'ws-check@trend.sa');
+    // وحدة من مساحة أخرى
+    await expect(
+      q(`UPDATE memberships SET org_unit_id = $1 WHERE user_id = $2`, [foreignUnit!.id, u]),
+    ).rejects.toThrow(/foreign key/);
+    // مدير ليس عضواً في المساحة
+    const [outsider] = await q<{ id: string }>(
+      `INSERT INTO users (tenant_id, email, name_ar) VALUES (app.current_tenant_id(), 'out@trend.sa', 'خارجي') RETURNING id`,
+    );
+    await expect(
+      q(`UPDATE memberships SET manager_id = $1 WHERE user_id = $2`, [outsider!.id, u]),
+    ).rejects.toThrow(/foreign key/);
+    // رئيس وحدة ليس عضواً في مساحتها
+    await expect(addUnit(db.appPool, A, 'sector', null, outsider!.id)).rejects.toThrow(
+      /foreign key/,
+    );
+    // ربط إضافي بوحدة من مساحة أخرى
+    await expect(
+      q(
+        `INSERT INTO membership_org_units (tenant_id, workspace_id, membership_id, org_unit_id)
+         SELECT tenant_id, workspace_id, id, $2 FROM memberships WHERE user_id = $1`,
+        [u, foreignUnit!.id],
+      ),
+    ).rejects.toThrow(/foreign key/);
+  });
+});
+
 describe('hierarchical visibility (§9.1)', () => {
   it('a manager sees their subtree and direct reports, not peers or superiors', async () => {
     const boss = await addUser(db.appPool, A, 'boss@trend.sa', 'admin');
@@ -120,8 +157,8 @@ describe('hierarchical visibility (§9.1)', () => {
     // عضو أصله في وحدة الزميل لكنه مرتبط إضافياً بفريق المدير (FR-ORG-02).
     const dual = await addUser(db.appPool, A, 'dual@trend.sa', 'member', { orgUnitId: peerDept });
     await q(
-      `INSERT INTO membership_org_units (tenant_id, membership_id, org_unit_id)
-       SELECT tenant_id, id, $2 FROM memberships WHERE user_id = $1`,
+      `INSERT INTO membership_org_units (tenant_id, workspace_id, membership_id, org_unit_id)
+       SELECT tenant_id, workspace_id, id, $2 FROM memberships WHERE user_id = $1`,
       [dual, team],
     );
 

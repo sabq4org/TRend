@@ -34,8 +34,8 @@ beforeAll(async () => {
         rows: [m],
       } = await c.query<{ id: string }>(`SELECT id FROM memberships WHERE role = 'member'`);
       await c.query(
-        `INSERT INTO membership_org_units (tenant_id, membership_id, org_unit_id) VALUES ($1, $2, $3)`,
-        [t.tenantId, m!.id, unit],
+        `INSERT INTO membership_org_units (tenant_id, workspace_id, membership_id, org_unit_id) VALUES ($1, $2, $3, $4)`,
+        [t.tenantId, t.workspaceId, m!.id, unit],
       );
       await c.query(
         `INSERT INTO outbox_events (tenant_id, topic, payload) VALUES ($1, 'x', '{}')`,

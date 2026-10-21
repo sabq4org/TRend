@@ -137,9 +137,11 @@ CREATE TABLE org_units (
   created_by   uuid DEFAULT app.current_user_id(),
   deleted_at   timestamptz,
   UNIQUE (tenant_id, id),
-  -- المفاتيح المركبة تمنع أي ربط بين مستأجرين حتى لو أخطأ الكود.
+  UNIQUE (workspace_id, id),
+  -- المفاتيح المركبة تمنع أي ربط بين مستأجرين أو بين مساحات حتى لو أخطأ الكود.
   FOREIGN KEY (tenant_id, workspace_id) REFERENCES workspaces (tenant_id, id),
   FOREIGN KEY (tenant_id, parent_id) REFERENCES org_units (tenant_id, id),
+  FOREIGN KEY (workspace_id, parent_id) REFERENCES org_units (workspace_id, id),
   FOREIGN KEY (tenant_id, head_user_id) REFERENCES users (tenant_id, id),
   CHECK (parent_id IS DISTINCT FROM id)
 );
@@ -216,21 +218,30 @@ CREATE TABLE memberships (
   created_by       uuid DEFAULT app.current_user_id(),
   deleted_at       timestamptz,
   UNIQUE (tenant_id, id),
+  UNIQUE (workspace_id, id),
   UNIQUE (workspace_id, user_id),
   FOREIGN KEY (tenant_id, user_id) REFERENCES users (tenant_id, id),
   FOREIGN KEY (tenant_id, workspace_id) REFERENCES workspaces (tenant_id, id),
   FOREIGN KEY (tenant_id, org_unit_id) REFERENCES org_units (tenant_id, id),
   FOREIGN KEY (tenant_id, manager_id) REFERENCES users (tenant_id, id),
+  -- القسم من المساحة نفسها، والمدير عضو في المساحة نفسها.
+  FOREIGN KEY (workspace_id, org_unit_id) REFERENCES org_units (workspace_id, id),
+  FOREIGN KEY (workspace_id, manager_id) REFERENCES memberships (workspace_id, user_id),
   CHECK ((role = 'guest') = (guest_expires_at IS NOT NULL)),
   CHECK (manager_id IS DISTINCT FROM user_id)
 );
 CREATE INDEX memberships_org_unit ON memberships (org_unit_id);
 CREATE INDEX memberships_manager ON memberships (manager_id);
 
+-- رئيس الوحدة عضو في مساحتها.
+ALTER TABLE org_units ADD FOREIGN KEY (workspace_id, head_user_id)
+  REFERENCES memberships (workspace_id, user_id);
+
 -- FR-ORG-02: ربط الموظف بأقسام إضافية.
 CREATE TABLE membership_org_units (
   id            uuid PRIMARY KEY DEFAULT app.uuid_v7(),
   tenant_id     uuid NOT NULL REFERENCES tenants (id),
+  workspace_id  uuid NOT NULL,
   membership_id uuid NOT NULL,
   org_unit_id   uuid NOT NULL,
   created_at    timestamptz NOT NULL DEFAULT now(),
@@ -238,7 +249,9 @@ CREATE TABLE membership_org_units (
   created_by    uuid DEFAULT app.current_user_id(),
   UNIQUE (membership_id, org_unit_id),
   FOREIGN KEY (tenant_id, membership_id) REFERENCES memberships (tenant_id, id) ON DELETE CASCADE,
-  FOREIGN KEY (tenant_id, org_unit_id) REFERENCES org_units (tenant_id, id)
+  FOREIGN KEY (tenant_id, org_unit_id) REFERENCES org_units (tenant_id, id),
+  FOREIGN KEY (workspace_id, membership_id) REFERENCES memberships (workspace_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (workspace_id, org_unit_id) REFERENCES org_units (workspace_id, id)
 );
 
 -- FR-ORG-05: أيام العمل وساعاته على مستوى الشركة (org_unit_id فارغ) أو القسم، مع دوام رمضان.
@@ -262,6 +275,7 @@ CREATE TABLE work_calendars (
   UNIQUE NULLS NOT DISTINCT (workspace_id, org_unit_id),
   FOREIGN KEY (tenant_id, workspace_id) REFERENCES workspaces (tenant_id, id),
   FOREIGN KEY (tenant_id, org_unit_id) REFERENCES org_units (tenant_id, id),
+  FOREIGN KEY (workspace_id, org_unit_id) REFERENCES org_units (workspace_id, id),
   CHECK (work_end > work_start),
   CHECK ((ramadan_start IS NULL) = (ramadan_end IS NULL)),
   CHECK (ramadan_end IS NULL OR ramadan_end > ramadan_start)
@@ -300,6 +314,8 @@ CREATE TABLE audit_events (
   tenant_id   uuid NOT NULL REFERENCES tenants (id),
   -- تسلسل لكل مستأجر، يُسند داخل المشغّل بعد أخذ القفل حتى يطابق ترتيب السلسلة.
   seq         bigint NOT NULL,
+  -- المساحة التي وقع فيها الحدث؛ فارغة للأحداث على مستوى المستأجر (المستأجر، المستخدمون).
+  workspace_id uuid,
   actor_id    uuid,
   -- user | system | api_key | mcp
   actor_type  text NOT NULL DEFAULT 'user',
@@ -315,6 +331,7 @@ CREATE TABLE audit_events (
   hash        bytea NOT NULL,
   UNIQUE (tenant_id, seq)
 );
+CREATE INDEX audit_events_workspace ON audit_events (tenant_id, workspace_id, seq DESC);
 CREATE INDEX audit_events_entity ON audit_events (tenant_id, entity_type, entity_id);
 CREATE INDEX audit_events_actor ON audit_events (tenant_id, actor_id, occurred_at DESC);
 
@@ -323,7 +340,7 @@ LANGUAGE sql IMMUTABLE AS $$
   SELECT digest(
     coalesce(prev, '\x'::bytea) ||
     convert_to(jsonb_build_object(
-      'tenant_id', e.tenant_id, 'id', e.id, 'actor_id', e.actor_id, 'actor_type', e.actor_type,
+      'tenant_id', e.tenant_id, 'workspace_id', e.workspace_id, 'id', e.id, 'actor_id', e.actor_id, 'actor_type', e.actor_type,
       'source', e.source, 'action', e.action, 'entity_type', e.entity_type, 'entity_id', e.entity_id,
       'before', e.before, 'after', e.after, 'ip', host(e.ip),
       'seq', e.seq, 'occurred_at_us', (extract(epoch FROM e.occurred_at) * 1000000)::bigint
@@ -395,9 +412,10 @@ BEGIN
     ELSE 'updated'
   END;
 
-  INSERT INTO audit_events (tenant_id, actor_id, actor_type, source, action, entity_type, entity_id, before, after, ip)
+  INSERT INTO audit_events (tenant_id, workspace_id, actor_id, actor_type, source, action, entity_type, entity_id, before, after, ip)
   VALUES (
     coalesce((ref->>'tenant_id')::uuid, (ref->>'id')::uuid),
+    CASE WHEN TG_TABLE_NAME = 'workspaces' THEN (ref->>'id')::uuid ELSE (ref->>'workspace_id')::uuid END,
     app.current_user_id(),
     CASE WHEN app.current_user_id() IS NULL THEN 'system' ELSE coalesce(nullif(current_setting('app.actor_type', true), ''), 'user') END,
     coalesce(nullif(current_setting('app.source', true), ''), 'app'),

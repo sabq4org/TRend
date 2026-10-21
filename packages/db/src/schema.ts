@@ -89,6 +89,7 @@ export const memberships = pgTable('memberships', {
 
 export const membershipOrgUnits = pgTable('membership_org_units', {
   ...tenantScoped,
+  workspaceId: uuid('workspace_id').notNull(),
   membershipId: uuid('membership_id').notNull(),
   orgUnitId: uuid('org_unit_id').notNull(),
 });
@@ -112,6 +113,7 @@ export const auditEvents = pgTable('audit_events', {
     .default(sql`app.uuid_v7()`),
   tenantId: uuid('tenant_id').notNull(),
   seq: bigint('seq', { mode: 'number' }).notNull(),
+  workspaceId: uuid('workspace_id'),
   actorId: uuid('actor_id'),
   actorType: text('actor_type').notNull(),
   source: text('source').notNull(),

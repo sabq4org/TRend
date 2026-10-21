@@ -147,6 +147,23 @@ describe('invitation email (FR-ORG-03)', () => {
     expect(reissued.body.token).not.toBe(first.body.invitation.token);
   });
 
+  it('replaces an unsent email when the invitation is reissued', async () => {
+    const first = await invited('stale@trend.sa');
+    mail.failNext = 1;
+    expect(await drain()).toBe(0);
+    const reissued = await api()
+      .post(`/api/v1/workspaces/${A.workspaceId}/members/${first.body.membershipId}/invitation`)
+      .set(bearer(await ownerToken()))
+      .expect(201);
+    await db.adminPool.query(
+      `UPDATE auth.mail_outbox SET send_after = now() WHERE to_email = 'stale@trend.sa'`,
+    );
+    expect(await drain()).toBe(1);
+    const sent = mail.sent.filter((m) => m.to === 'stale@trend.sa');
+    expect(sent).toHaveLength(1);
+    expect(linkIn(sent[0]!.text)).toContain(reissued.body.token);
+  });
+
   it('is not sent when the invitation fails', async () => {
     await invited('twice@trend.sa');
     await drain();

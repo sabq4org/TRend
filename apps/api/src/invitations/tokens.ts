@@ -17,7 +17,7 @@ export interface IssuedInvitation {
 
 /**
  * يصدر رمزاً جديداً ويلغي أي رمز سابق غير مستخدم للعضوية نفسها، ويضع بريد الدعوة في
- * صندوق الصادر بلغة المدعو. داخل معاملة المستأجر، فلا يُرسل بريد لدعوة لم تثبت.
+ * صندوق الصادر بلغة المدعو بدل أي بريد سابق لم يُرسل (رابطه بطل). داخل معاملة المستأجر، فلا يُرسل بريد لدعوة لم تثبت.
  */
 export async function issueInvitation(
   c: PoolClient,
@@ -69,16 +69,22 @@ export async function issueInvitation(
   );
   const locale = isLocale(m!.locale) ? m!.locale : 'ar';
   const named = (ar: string | null, en: string | null) => (locale === 'en' ? (en ?? ar) : ar) ?? '';
-  await enqueueMail(c, m!.email, locale, {
-    template: 'invitation',
-    payload: {
-      name: named(m!.name_ar, m!.name_en),
-      inviter: named(m!.inviter_ar, m!.inviter_en) || m!.workspace,
-      workspace: m!.workspace,
-      role: m!.role,
-      url: `${base}/${locale}/invite/${token}`,
-      expiresAt: issued.expiresAt.toISOString(),
+  await enqueueMail(
+    c,
+    m!.email,
+    locale,
+    {
+      template: 'invitation',
+      payload: {
+        name: named(m!.name_ar, m!.name_en),
+        inviter: named(m!.inviter_ar, m!.inviter_en) || m!.workspace,
+        workspace: m!.workspace,
+        role: m!.role,
+        url: `${base}/${locale}/invite/${token}`,
+        expiresAt: issued.expiresAt.toISOString(),
+      },
     },
-  });
+    `invitation:${membership.id}`,
+  );
   return issued;
 }

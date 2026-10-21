@@ -15,6 +15,8 @@ CREATE TABLE auth.mail_outbox (
   to_email     text NOT NULL CHECK (char_length(to_email) <= 320),
   locale       text NOT NULL DEFAULT 'ar' CHECK (locale IN ('ar', 'en')),
   payload      jsonb NOT NULL DEFAULT '{}',
+  -- رسالة أحدث بالمفتاح نفسه تلغي ما لم يُرسل بعد (مثل دعوة أعيد إصدارها فبطل رابطها).
+  supersede_key text,
   created_at   timestamptz NOT NULL DEFAULT now(),
   send_after   timestamptz NOT NULL DEFAULT now(),
   -- يحجز الصف لعامل واحد؛ إن توقف العامل أثناء الإرسال يعود الصف متاحاً بعد انقضائه.
@@ -25,11 +27,13 @@ CREATE TABLE auth.mail_outbox (
 );
 CREATE INDEX mail_outbox_pending ON auth.mail_outbox (send_after) WHERE sent_at IS NULL;
 CREATE INDEX mail_outbox_recent ON auth.mail_outbox (to_email, template, created_at);
+CREATE INDEX mail_outbox_supersede ON auth.mail_outbox (supersede_key) WHERE sent_at IS NULL;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON auth.mail_outbox TO trend_auth;
--- دور التطبيق يضيف رسائل الدعوة داخل معاملة المستأجر، ولا يقرأ الصندوق.
+-- دور التطبيق يضيف رسائل الدعوة داخل معاملة المستأجر، ويلغي ما بطل منها. لا يقرأ محتوى الرسائل.
 GRANT USAGE ON SCHEMA auth TO trend_app;
-GRANT INSERT ON auth.mail_outbox TO trend_app;
+GRANT INSERT, DELETE ON auth.mail_outbox TO trend_app;
+GRANT SELECT (supersede_key, sent_at) ON auth.mail_outbox TO trend_app;
 
 ------------------------------------------------------------------------------
 -- مستلم رسالة الاستعادة: اسم ولغة مستخدم نشط لهوية الدخول، وإلا لا شيء.

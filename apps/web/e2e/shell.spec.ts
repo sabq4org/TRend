@@ -1,6 +1,11 @@
 import { expect, test } from '@playwright/test';
+import { mockApi, signedIn } from './helpers';
 
 // §10.2 العربية أولاً، §10.3 بنية التنقل، FR-ADM-04 اللغتان والوضعان.
+
+test.beforeEach(async ({ page }) => {
+  await mockApi(page, signedIn(false));
+});
 
 test('defaults to Arabic, right-to-left', async ({ page }) => {
   await page.goto('/');

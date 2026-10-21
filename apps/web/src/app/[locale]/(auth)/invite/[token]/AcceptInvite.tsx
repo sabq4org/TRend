@@ -5,7 +5,13 @@ import { useState, type FormEvent } from 'react';
 import { Alert, primaryButton } from '@/components/auth/Alert';
 import { PasswordField } from '@/components/auth/PasswordField';
 import { useRouter } from '@/i18n/routing';
-import { acceptInvitation, AuthError, nextPathAfterSignIn, signIn } from '@/lib/auth-client';
+import {
+  acceptInvitation,
+  AuthError,
+  nextPathAfterSignIn,
+  signIn,
+  withRequestedPath,
+} from '@/lib/auth-client';
 
 // يطابق acceptInvitationSchema في الخادم.
 const MIN_LENGTH = 10;
@@ -48,7 +54,7 @@ export function AcceptInvite({ token }: { token: string }) {
     // الدعوة استُهلكت والحساب مفعّل؛ إن تعثّر الدخول التلقائي فشاشة الدخول هي الطريق.
     try {
       const { twoFactor } = await signIn(email, password);
-      router.push(twoFactor ? '/login/two-factor' : await nextPathAfterSignIn());
+      router.push(twoFactor ? withRequestedPath('/login/two-factor') : await nextPathAfterSignIn());
     } catch {
       router.push('/login');
     }

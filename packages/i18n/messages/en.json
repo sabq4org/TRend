@@ -124,6 +124,13 @@
       "invalid": "This invitation link is invalid, expired or already used.",
       "existingAccount": "This email already has a TRend account. Enter its current password to add the workspace to it.",
       "locked": "Too many failed attempts. Try again in 15 minutes."
-    }
+    },
+    "signOut": "Sign out",
+    "gate": {
+      "checking": "Checking your session…",
+      "offline": "We couldn't reach the server. Check your connection and try again.",
+      "retry": "Try again"
+    },
+    "signOutFailed": "Couldn't sign out; your session is still active. Try again."
   }
 }

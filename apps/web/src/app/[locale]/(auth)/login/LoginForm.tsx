@@ -6,7 +6,7 @@ import { Alert, primaryButton } from '@/components/auth/Alert';
 import { Locked } from '@/components/auth/Locked';
 import { inputClass, PasswordField } from '@/components/auth/PasswordField';
 import { useRouter } from '@/i18n/routing';
-import { AuthError, nextPathAfterSignIn, signIn } from '@/lib/auth-client';
+import { AuthError, nextPathAfterSignIn, signIn, withRequestedPath } from '@/lib/auth-client';
 
 // §9.2: الدخول ببريد العمل وكلمة المرور؛ القفل بعد 5 محاولات يظهر بمدة متبقية.
 export function LoginForm() {
@@ -22,7 +22,7 @@ export function LoginForm() {
     setError(null);
     try {
       const { twoFactor } = await signIn(String(form.get('email')), String(form.get('password')));
-      router.push(twoFactor ? '/login/two-factor' : await nextPathAfterSignIn());
+      router.push(twoFactor ? withRequestedPath('/login/two-factor') : await nextPathAfterSignIn());
     } catch (err) {
       setError(err instanceof AuthError ? err : new AuthError('unexpected', 0));
       setBusy(false);

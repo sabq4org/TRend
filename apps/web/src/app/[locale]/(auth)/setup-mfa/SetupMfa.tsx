@@ -6,7 +6,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Alert, primaryButton } from '@/components/auth/Alert';
 import { inputClass, PasswordField } from '@/components/auth/PasswordField';
 import { useRouter } from '@/i18n/routing';
-import { AuthError, enableTwoFactor, verifyTotp } from '@/lib/auth-client';
+import { AuthError, enableTwoFactor, requestedPath, verifyTotp } from '@/lib/auth-client';
 
 type Step =
   | { name: 'password' }
@@ -161,7 +161,7 @@ export function SetupMfa() {
             <CopyButton text={step.backupCodes.join('\n')} />
             <button
               type="button"
-              onClick={() => router.push('/')}
+              onClick={() => router.push(requestedPath() ?? '/')}
               className={`${primaryButton} px-7`}
             >
               {t('setupMfa.done')}

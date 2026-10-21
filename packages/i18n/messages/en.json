@@ -53,5 +53,77 @@
     "mfaRequired": "Two-factor authentication must be enabled on your account to continue",
     "invalidInvitation": "The invitation link is invalid, expired or already used",
     "accountLocked": "Too many failed attempts. Try again in 15 minutes"
+  },
+  "auth": {
+    "brandHeadline": "All of your team's work and goals in one place",
+    "brandPoint1": "Tasks and projects that follow your org chart",
+    "brandPoint2": "Goals and performance tied to daily work",
+    "brandPoint3": "Fine-grained permissions and an audit trail for every action",
+    "email": "Email",
+    "password": "Password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "backToLogin": "Back to sign in",
+    "unexpected": "Couldn't reach the server. Please try again shortly.",
+    "login": {
+      "title": "Sign in",
+      "subtitle": "Enter your work email and password to reach your workspace.",
+      "submit": "Sign in",
+      "inviteOnly": "Sign-in is by invitation only. No account? Ask your workspace admin to invite you.",
+      "footer": "You can end your sessions on any device from your account settings.",
+      "invalid": "Wrong email or password. After 5 failed attempts sign-in is locked for 15 minutes.",
+      "noAccess": "Your account isn't linked to an active workspace. Contact your workspace admin."
+    },
+    "locked": {
+      "title": "Sign-in paused for now",
+      "body": "A wrong password was entered 5 times for this account. To protect it, you can try again in:",
+      "hint": "If this wasn't you, let your workspace admin know."
+    },
+    "twoFactor": {
+      "title": "Enter your verification code",
+      "subtitle": "Open the authenticator app on your phone and enter the 6-digit code shown for TRend.",
+      "code": "Verification code",
+      "submit": "Verify and sign in",
+      "useBackup": "Use a backup code",
+      "useApp": "Use the authenticator app",
+      "backupTitle": "Enter a backup code",
+      "backupSubtitle": "One of the backup codes you saved when turning on two-factor authentication. Each code works once.",
+      "backupCode": "Backup code",
+      "invalid": "The code is wrong or has expired.",
+      "expired": "Verification timed out. Please sign in again."
+    },
+    "setupMfa": {
+      "badge": "Required for your role",
+      "title": "Turn on two-factor authentication to continue",
+      "subtitle": "Because your account has admin permissions, we ask for a code from your phone at every sign-in. Setup takes a minute.",
+      "confirmPassword": "Confirm your password to start",
+      "start": "Continue",
+      "step1Title": "Install an authenticator app",
+      "step1Body": "Such as Google Authenticator or Microsoft Authenticator.",
+      "step2Title": "Scan the code or enter the key manually",
+      "secret": "Key",
+      "copy": "Copy",
+      "copied": "Copied",
+      "qrLabel": "QR code to add TRend to your authenticator app",
+      "step3Title": "Enter the code shown in the app",
+      "activate": "Turn on",
+      "backupTitle": "Save your backup codes",
+      "backupBody": "Use one if you lose your phone. Each code works once, and we won't show them again.",
+      "done": "I've saved them, continue",
+      "wrongPassword": "Wrong password."
+    },
+    "invite": {
+      "title": "Welcome to TRend",
+      "subtitle": "Choose a password to activate your account.",
+      "newPassword": "Password",
+      "confirm": "Confirm password",
+      "ruleLength": "At least 10 characters",
+      "ruleMatch": "Both passwords match",
+      "submit": "Activate account",
+      "note": "This link works once. If it has expired, ask your admin to send it again.",
+      "invalid": "This invitation link is invalid, expired or already used.",
+      "existingAccount": "This email already has a TRend account. Enter its current password to add the workspace to it.",
+      "locked": "Too many failed attempts. Try again in 15 minutes."
+    }
   }
 }

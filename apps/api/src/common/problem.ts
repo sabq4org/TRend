@@ -28,6 +28,7 @@ export class ProblemException extends HttpException {
     status: number,
     readonly code: ErrorCode,
     readonly errors?: Problem['errors'],
+    readonly headers: Record<string, string> = {},
   ) {
     super(code, status);
   }
@@ -38,6 +39,11 @@ export const notFound = () => new ProblemException(HttpStatus.NOT_FOUND, 'notFou
 export const unauthorized = () => new ProblemException(HttpStatus.UNAUTHORIZED, 'unauthorized');
 export const conflict = () => new ProblemException(HttpStatus.CONFLICT, 'conflict');
 export const mfaRequired = () => new ProblemException(HttpStatus.FORBIDDEN, 'mfaRequired');
+/** §9.2: قفل الدخول بعد المحاولات الفاشلة. */
+export const accountLocked = (retryAfter: number) =>
+  new ProblemException(HttpStatus.TOO_MANY_REQUESTS, 'accountLocked', undefined, {
+    'Retry-After': String(retryAfter),
+  });
 export const invalidInvitation = () =>
   new ProblemException(HttpStatus.BAD_REQUEST, 'invalidInvitation');
 
@@ -68,6 +74,7 @@ export class ProblemFilter implements ExceptionFilter {
       );
     } else if (exception instanceof ProblemException) {
       problem = toProblem(exception.getStatus(), exception.code, exception.errors);
+      res.set(exception.headers);
     } else if (exception instanceof HttpException) {
       const status = exception.getStatus();
       problem = toProblem(status, statusCodes[status] ?? 'internal');

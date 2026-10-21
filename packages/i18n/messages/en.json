@@ -51,6 +51,7 @@
     "conflict": "Conflicts with existing data",
     "internal": "An unexpected error occurred",
     "mfaRequired": "Two-factor authentication must be enabled on your account to continue",
-    "invalidInvitation": "The invitation link is invalid, expired or already used"
+    "invalidInvitation": "The invitation link is invalid, expired or already used",
+    "accountLocked": "Too many failed attempts. Try again in 15 minutes"
   }
 }

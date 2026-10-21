@@ -21,23 +21,26 @@ import { loadConfig } from '../src/config';
 let db: TestDatabase;
 let app: INestApplication;
 let A: ProvisionResult;
+let B: ProvisionResult;
 
 const api = () => request(app.getHttpServer());
+const accept = (token: string, password = PASSWORD) =>
+  request(app.getHttpServer()).post('/api/v1/invitations/accept').send({ token, password });
 const auth = (path: string) => `/api/v1/auth${path}`;
 const bearer = (t: string) => ({ Authorization: `Bearer ${t}` });
 // كلمة مرور تُولَّد لكل تشغيل، فلا تظهر قيمة ثابتة في المستودع.
 const PASSWORD = `test-${randomBytes(12).toString('hex')}`;
 
 /** يدعو عضواً بصلاحية المالك ويعيد رمز الدعوة. */
-async function invite(email: string, role: 'admin' | 'member') {
+async function invite(email: string, role: 'admin' | 'member', t = A) {
   const owner = await issueAccessToken(app.get<Auth>(AUTH), {
-    sub: A.ownerUserId,
-    tid: A.tenantId,
+    sub: t.ownerUserId,
+    tid: t.tenantId,
     priv: true,
     mfa: true,
   });
   const res = await api()
-    .post(`/api/v1/workspaces/${A.workspaceId}/members`)
+    .post(`/api/v1/workspaces/${t.workspaceId}/members`)
     .set(bearer(owner))
     .send({ email, nameAr: email.split('@')[0], role })
     .expect(201);
@@ -88,6 +91,11 @@ beforeAll(async () => {
     tenantName: 'ترند',
     workspaceName: 'ترند',
     owner: { email: 'owner@trend.sa', nameAr: 'المالك' },
+  });
+  B = await provisionTenant(db.adminPool, {
+    tenantName: 'أخرى',
+    workspaceName: 'أخرى',
+    owner: { email: 'owner@other.sa', nameAr: 'مالك آخر' },
   });
   app = await createApp(config);
   await app.init();
@@ -161,6 +169,27 @@ describe('invitation acceptance (FR-ORG-03)', () => {
       .send({ token: sara.invitation.token, password: PASSWORD })
       .expect(400);
     expect(res.body.code).toBe('invalidInvitation');
+  });
+
+  it('refuses an invitation once the account is suspended', async () => {
+    const later = await invite('later@trend.sa', 'member');
+    await db.adminPool.query(`UPDATE users SET status = 'suspended' WHERE id = $1`, [later.userId]);
+    const res = await accept(later.invitation.token).expect(400);
+    expect(res.body.code).toBe('invalidInvitation');
+  });
+
+  it('an existing identity joins another tenant only with its own password, under lockout', async () => {
+    await db.adminPool.query(`DELETE FROM auth.login_lockouts`);
+    const other = await invite('sara@trend.sa', 'member', B);
+    for (let i = 0; i < 5; i++)
+      await accept(other.invitation.token, 'not-her-password-1').expect(401);
+    const locked = await accept(other.invitation.token).expect(429);
+    expect(locked.body.code).toBe('accountLocked');
+    expect(locked.headers['retry-after']).toBeDefined();
+    // القفل نفسه يمنع الدخول العادي.
+    await signIn('sara@trend.sa').expect(429);
+    await db.adminPool.query(`DELETE FROM auth.login_lockouts`);
+    await accept(other.invitation.token).expect(200);
   });
 
   it('records acceptance in the audit log without the token hash', async () => {
@@ -280,7 +309,10 @@ describe('two-factor authentication (§9.2)', () => {
     expect(me.body.mfaRequired).toBe(true);
   });
 
+  let preEnrollment: string;
+
   it('enables TOTP after confirming a code', async () => {
+    preEnrollment = await session('noor@trend.sa');
     const s = await session('noor@trend.sa');
     const enable = await api()
       .post(auth('/two-factor/enable'))
@@ -315,8 +347,16 @@ describe('two-factor authentication (§9.2)', () => {
       .post(auth('/two-factor/verify-totp'))
       .send({ code: totp(otpUri) })
       .expect(200);
-    const { jwt } = await accessToken(second.headers['set-auth-token'] as string);
+    const { jwt, next } = await accessToken(second.headers['set-auth-token'] as string);
     expect(decodeJwt(jwt)).toMatchObject({ priv: true, mfa: true });
+    // التدوير يحفظ مستوى التحقق.
+    expect(decodeJwt((await accessToken(next)).jwt)).toMatchObject({ mfa: true });
     await api().get(`/api/v1/workspaces/${A.workspaceId}/members`).set(bearer(jwt)).expect(200);
+  });
+
+  it('password-only sessions from before enrollment stay without MFA', async () => {
+    const { jwt } = await accessToken(preEnrollment);
+    expect(decodeJwt(jwt)).toMatchObject({ priv: true, mfa: false });
+    await api().get(`/api/v1/workspaces/${A.workspaceId}/members`).set(bearer(jwt)).expect(403);
   });
 });

@@ -4,8 +4,8 @@ import { acceptInvitationSchema, type AcceptInvitationInput } from '@trend/schem
 import type { Pool } from 'pg';
 import { AUTH, AUTH_POOL } from '../auth/auth.module';
 import { Public } from '../auth/auth.guard';
-import type { Auth } from '../auth/better-auth';
-import { invalidInvitation, unauthorized } from '../common/problem';
+import { lockedFor, recordPasswordAttempt, type Auth } from '../auth/better-auth';
+import { accountLocked, invalidInvitation, unauthorized } from '../common/problem';
 import { ZodPipe } from '../common/zod.pipe';
 import { PG_POOL } from '../database/database.module';
 import { hashInvitationToken } from './tokens';
@@ -38,7 +38,7 @@ export class InvitationsService {
         `SELECT i.id, i.user_id, u.email, u.name_ar
            FROM invitations i JOIN users u ON u.id = i.user_id
           WHERE i.token_hash = $1 AND i.accepted_at IS NULL AND i.expires_at > now()
-            AND u.deleted_at IS NULL
+            AND u.deleted_at IS NULL AND u.status = 'invited'
           FOR UPDATE OF i`,
         [hash],
       );
@@ -69,8 +69,12 @@ export class InvitationsService {
     );
     const existing = rows[0];
     if (existing) {
+      // §9.2: نفس عدّاد القفل الذي يحمي /sign-in/email، فلا يصبح القبول طريقاً لتخمين كلمة المرور.
+      const retryAfter = await lockedFor(this.authPool, email);
+      if (retryAfter !== null) throw accountLocked(retryAfter);
       const ok =
         !!existing.password && (await ctx.password.verify({ hash: existing.password, password }));
+      await recordPasswordAttempt(this.authPool, email, ok);
       if (!ok) throw unauthorized();
       return existing.id;
     }

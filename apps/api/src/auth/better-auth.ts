@@ -31,6 +31,35 @@ export interface AuthDeps {
   appPool: Pool;
 }
 
+/** §9.2: هل البريد مقفل الآن؟ يعيد الثواني المتبقية. */
+export async function lockedFor(pool: Pool, email: string): Promise<number | null> {
+  const { rows } = await pool.query<{ locked_until: Date }>(
+    'SELECT locked_until FROM login_lockouts WHERE email = $1 AND locked_until > now()',
+    [email.trim().toLowerCase()],
+  );
+  return rows[0] ? Math.ceil((rows[0].locked_until.getTime() - Date.now()) / 1000) : null;
+}
+
+/** §9.2: يحسب محاولة تحقق من كلمة المرور؛ الخامسة الفاشلة تقفل 15 دقيقة، والنجاح يصفّر. */
+export async function recordPasswordAttempt(pool: Pool, email: string, ok: boolean) {
+  const key = email.trim().toLowerCase();
+  if (ok) {
+    await pool.query('DELETE FROM login_lockouts WHERE email = $1', [key]);
+    return;
+  }
+  await pool.query(
+    `INSERT INTO login_lockouts (email, failed_count) VALUES ($1, 1)
+     ON CONFLICT (email) DO UPDATE SET
+       failed_count = CASE WHEN login_lockouts.failed_count + 1 >= $2 THEN 0
+                           ELSE login_lockouts.failed_count + 1 END,
+       locked_until = CASE WHEN login_lockouts.failed_count + 1 >= $2
+                           THEN now() + make_interval(secs => $3)
+                           ELSE login_lockouts.locked_until END,
+       updated_at = now()`,
+    [key, MAX_FAILED_SIGN_INS, LOCKOUT_SECONDS],
+  );
+}
+
 export function createAuth({ config, authPool, appPool }: AuthDeps) {
   const resolveLogin = async (identity: string): Promise<ResolvedLogin> => {
     const { rows } = await appPool.query<{
@@ -73,20 +102,18 @@ export function createAuth({ config, authPool, appPool }: AuthDeps) {
     session: {
       expiresIn: 60 * 60 * 24 * 30,
       updateAge: 60 * 60 * 24,
+      // §9.2: اجتازت هذه الجلسة بعينها العامل الثاني. تفعيل TOTP على الحساب وحده لا يكفي،
+      // وإلا حصلت جلسات كلمة المرور السابقة للتفعيل على mfa=true.
+      additionalFields: {
+        mfaVerified: { type: 'boolean', required: false, defaultValue: false, input: false },
+      },
     },
     rateLimit: { enabled: config.NODE_ENV === 'production', window: 60, max: 100 },
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
         if (ctx.path !== '/sign-in/email') return;
-        const email = String(ctx.body?.email ?? '')
-          .trim()
-          .toLowerCase();
-        const { rows } = await authPool.query<{ locked_until: Date }>(
-          'SELECT locked_until FROM login_lockouts WHERE email = $1 AND locked_until > now()',
-          [email],
-        );
-        if (rows[0]) {
-          const retryAfter = Math.ceil((rows[0].locked_until.getTime() - Date.now()) / 1000);
+        const retryAfter = await lockedFor(authPool, String(ctx.body?.email ?? ''));
+        if (retryAfter !== null) {
           throw new APIError('TOO_MANY_REQUESTS', {
             code: 'ACCOUNT_LOCKED',
             message: 'Too many failed sign-in attempts',
@@ -96,26 +123,9 @@ export function createAuth({ config, authPool, appPool }: AuthDeps) {
       }),
       after: createAuthMiddleware(async (ctx) => {
         if (ctx.path !== '/sign-in/email') return;
-        const email = String(ctx.body?.email ?? '')
-          .trim()
-          .toLowerCase();
         const failed =
           ctx.context.returned instanceof APIError && ctx.context.returned.statusCode === 401;
-        if (!failed) {
-          await authPool.query('DELETE FROM login_lockouts WHERE email = $1', [email]);
-          return;
-        }
-        await authPool.query(
-          `INSERT INTO login_lockouts (email, failed_count) VALUES ($1, 1)
-           ON CONFLICT (email) DO UPDATE SET
-             failed_count = CASE WHEN login_lockouts.failed_count + 1 >= $2 THEN 0
-                                 ELSE login_lockouts.failed_count + 1 END,
-             locked_until = CASE WHEN login_lockouts.failed_count + 1 >= $2
-                                 THEN now() + make_interval(secs => $3)
-                                 ELSE login_lockouts.locked_until END,
-             updated_at = now()`,
-          [email, MAX_FAILED_SIGN_INS, LOCKOUT_SECONDS],
-        );
+        await recordPasswordAttempt(authPool, String(ctx.body?.email ?? ''), !failed);
       }),
     },
     plugins: [
@@ -134,29 +144,48 @@ export function createAuth({ config, authPool, appPool }: AuthDeps) {
           issuer: config.JWT_ISSUER,
           audience: config.JWT_AUDIENCE,
           expirationTime: ACCESS_TOKEN_TTL,
-          definePayload: async ({ user }) => {
+          definePayload: async ({ user, session }) => {
             const login = await resolveLogin(user.id);
+            const enrolled = Boolean(
+              (user as { twoFactorEnabled?: boolean | null }).twoFactorEnabled,
+            );
             return {
               tid: login.tenantId,
               priv: login.privileged,
-              mfa: Boolean((user as { twoFactorEnabled?: boolean | null }).twoFactorEnabled),
+              mfa: enrolled && Boolean((session as { mfaVerified?: boolean | null }).mfaVerified),
             };
           },
           getSubject: async ({ user }) => (await resolveLogin(user.id)).userId,
         },
       }),
-      // §8.1: رمز التجديد يدور عند كل استخدام. يأتي قبل bearer ليصل الرمز الجديد للجوال أيضاً.
+      // يأتي قبل bearer ليصل رمز الجلسة الجديد للجوال أيضاً في ترويسة set-auth-token.
       {
-        id: 'trend-session-rotation',
+        id: 'trend-sessions',
         hooks: {
           after: [
             {
+              // §9.2: الجلسة التي تنشأ بعد التحقق من العامل الثاني (عند الدخول أو عند التفعيل)
+              // هي وحدها التي تُعلَّم. جلسات كلمة المرور الأخرى تبقى بلا mfa.
+              matcher: (ctx) => ctx.path?.startsWith('/two-factor/verify-') ?? false,
+              handler: createAuthMiddleware(async (ctx) => {
+                const created = ctx.context.newSession;
+                if (!created || ctx.context.returned instanceof APIError) return;
+                await ctx.context.internalAdapter.updateSession(created.session.token, {
+                  mfaVerified: true,
+                });
+              }),
+            },
+            {
+              // §8.1: رمز التجديد يدور عند كل استخدام، ويرث مستوى التحقق من الجلسة السابقة.
               matcher: (ctx) => ctx.path === '/token',
               handler: createAuthMiddleware(async (ctx) => {
                 const current = ctx.context.session;
                 if (!current || ctx.context.returned instanceof APIError) return;
                 const adapter = ctx.context.internalAdapter;
                 const next = await adapter.createSession(current.user.id);
+                if ((current.session as { mfaVerified?: boolean | null }).mfaVerified) {
+                  await adapter.updateSession(next.token, { mfaVerified: true });
+                }
                 await adapter.updateSession(current.session.token, {
                   expiresAt: new Date(Date.now() + ROTATION_GRACE_SECONDS * 1000),
                 });

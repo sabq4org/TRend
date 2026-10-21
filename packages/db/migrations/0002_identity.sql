@@ -48,7 +48,9 @@ CREATE TABLE auth."session" (
   "updatedAt" timestamptz NOT NULL,
   "ipAddress" text,
   "userAgent" text,
-  "userId" uuid NOT NULL REFERENCES auth."user" ("id") ON DELETE CASCADE
+  "userId" uuid NOT NULL REFERENCES auth."user" ("id") ON DELETE CASCADE,
+  -- §9.2: هذه الجلسة اجتازت العامل الثاني (حقل إضافي في إعداد Better Auth).
+  "mfaVerified" boolean
 );
 CREATE INDEX "session_userId_idx" ON auth."session" ("userId");
 

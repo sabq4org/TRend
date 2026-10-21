@@ -1,0 +1,82 @@
+# §12.4: كل دفع يشغّل فحص الأنواع والتنسيق واختبارات الوحدات وفحص التبعيات والأسرار.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-retries 10
+    env:
+      DATABASE_ADMIN_URL: postgres://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Format
+        run: pnpm format:check
+      - name: Lint
+        run: pnpm lint
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Translations complete (NFR-14)
+        run: pnpm i18n:check
+      - name: Unit, integration and tenant-isolation tests (§15.1 gate, NFR-15, NFR-16)
+        run: pnpm test
+      # NFR-11: لا ثغرات عالية أو حرجة. الاستثناءات الموثقة في docs/phase-2-foundation.md
+      # (pnpm.auditConfig في package.json) كلها في أدوات بناء Expo/Metro لا في ما يُشغَّل للمستخدم.
+      - name: Dependency audit (NFR-11)
+        run: pnpm audit --prod --audit-level high
+
+  web-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build --filter @trend/web
+      - run: pnpm --filter @trend/web exec playwright install --with-deps chromium
+      - name: RTL/LTR and theme smoke tests (§10.2, FR-ADM-04)
+        run: pnpm --filter @trend/web test:e2e
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan history for secrets (§9.2)
+        run: docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.28.0 git --redact -v /repo

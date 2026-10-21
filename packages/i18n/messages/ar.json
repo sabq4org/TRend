@@ -1,0 +1,54 @@
+{
+  "app": {
+    "name": "ترند",
+    "tagline": "كل التزام له صاحب وموعد ودليل إنجاز"
+  },
+  "nav": {
+    "home": "الرئيسية",
+    "tasks": "المهام",
+    "projects": "المشاريع",
+    "chats": "المحادثات",
+    "meetings": "الاجتماعات",
+    "notes": "الملاحظات",
+    "performance": "الإنجاز",
+    "calendar": "التقويم",
+    "support": "الدعم",
+    "settings": "الإعدادات",
+    "quickAdd": "إضافة سريعة",
+    "search": "بحث شامل"
+  },
+  "common": {
+    "tasksCount": "{count, plural, zero {لا مهام} one {مهمة واحدة} two {مهمتان} few {# مهام} many {# مهمة} other {# مهمة}}",
+    "language": "اللغة",
+    "theme": "المظهر",
+    "themeLight": "فاتح",
+    "themeDark": "داكن",
+    "switchLanguage": "English",
+    "comingSoon": "قيد البناء ضمن مراحل التنفيذ"
+  },
+  "home": {
+    "title": "مرحباً بك في ترند",
+    "emptyTitle": "لا يوجد شيء هنا بعد",
+    "emptyBody": "ستظهر هنا مهامك المتأخرة ومستحقات اليوم والأسبوع بعد إطلاق نواة العمل."
+  },
+  "roles": {
+    "owner": "مالك",
+    "admin": "مشرف",
+    "member": "عضو",
+    "guest": "ضيف"
+  },
+  "orgUnitTypes": {
+    "sector": "قطاع",
+    "department": "إدارة",
+    "section": "قسم",
+    "team": "فريق"
+  },
+  "errors": {
+    "unauthorized": "يجب تسجيل الدخول للمتابعة",
+    "forbidden": "لا تملك صلاحية تنفيذ هذا الإجراء",
+    "notFound": "العنصر المطلوب غير موجود",
+    "validation": "البيانات المُرسلة غير صالحة",
+    "conflict": "تعارض مع بيانات موجودة",
+    "internal": "حدث خطأ غير متوقع"
+  }
+}
